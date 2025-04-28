@@ -19,6 +19,21 @@
 
 During setup of the EVSE Load Balancer integration it expects to be provided with a meter source, charger device and main fuse parameters. It will then monitor the power consumption and production in your home and dynamically adjusts the charging current of your EV charger to ensure that your home's power usage stays within safe limits.
 
+Key parts of the process include:
+
+- **Real-Time Monitoring:**  
+  The balancer reads your meter's current consumption on each phase and calculates the remaining “available current”, which is basically the difference between your fuse’s capacity and your current load.
+
+- **Risk-Based Adjustments:**  
+  When the available current drops below zero (indicating potential overload), the algorithm quickly increases an accumulated "risk" factor. Once this risk exceeds a preset threshold, the charger’s current limit is immediately reduced to protect your circuit. 
+  
+  These "risk presets" are derived from the thermal behavior of B- and C-character circuit breakers. The algorithm tolerates brief overcurrent spikes, accumulating risk over time; if these spikes are too frequent or severe, the risk level exceeds a set threshold and the charger’s limit is immediately reduced to protect your fuse. Conversely, when surplus power is detected, the system only restores charging power after confirming that recovery conditions are stable over a configurable time period (a minimum of 15 minutes, extendable during periods of unstable usage).
+  
+- **Per-Phase Balancing:**  
+  All calculations are performed separately for each electrical phase, ensuring that the load is balanced and your circuit remains safe under varying conditions. The ability to make use of this depends on your charger's capabilities though.
+
+This adaptive approach allows the EVSE Load Balancer to optimize charging power while preventing overloads, making the most of your available energy, putting the least amount of stress on your charger, car and circuit breaker. 
+
 ## Supported Devices
 
 ### Energy Meters
@@ -60,11 +75,6 @@ For homes without a compatible energy meter, you can manually configure sensors 
 
 The integration emits events to Home Assistant's event log whenever the charger current limit is adjusted. These events can be used to create automations or monitor the system's behavior.
 
-## Example Use Cases
-
-- **Prevent Overloads**: Automatically reduce the EV charger's current when other appliances are consuming high amounts of power.
-- **Optimize Solar Usage**: Increase the EV charger's current when excess solar power is available.
-- **Multi-Charger Support**: Balance loads across multiple chargers in a single installation.
 
 ## Contributing
 

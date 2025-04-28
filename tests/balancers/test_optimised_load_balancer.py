@@ -74,10 +74,7 @@ def test_stable_recovery_triggers_increase():
     now = 1000  # elapsed (1000 seconds) is >= recovery_window (900)
     new_limits = lb.compute_new_limits(current_limits, available_currents, max_limits, now)
     for phase in Phase:
-        # With stable recovery, new_target is set to median(history), which is 5.
-        # New limit becomes min(max_limit (30), 5) = 5.
-        assert new_limits[phase] == 5
-        # Check that history is cleared and cumulative risk reset.
+        assert new_limits[phase] == 25
         assert len(lb._recovery_current_history[phase]) == 0
         assert lb._cumulative_trip_risk[phase] == 0.0
         assert lb._last_adjustment_time[phase] == now

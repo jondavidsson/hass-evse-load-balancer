@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 OPTION_CHARGE_LIMIT_HYSTERESIS = "charge_limit_hysteresis"
 
-DEFAULT_VALUES: dict[str, Any] = {OPTION_CHARGE_LIMIT_HYSTERESIS: 5}
+DEFAULT_VALUES: dict[str, Any] = {OPTION_CHARGE_LIMIT_HYSTERESIS: 15}
 
 
 async def validate_init_input(

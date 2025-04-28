@@ -3,7 +3,6 @@
 import logging
 from datetime import datetime, timedelta
 from math import floor
-from statistics import median
 from time import time
 from typing import TYPE_CHECKING
 
@@ -18,6 +17,9 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from . import config_flow as cf
 from . import options_flow as of
+from .balancers.optimised_load_balancer import (
+    OptimisedLoadBalancer,
+)
 from .chargers.charger import Charger
 from .const import (
     COORDINATOR_STATE_AWAITING_CHARGER,
@@ -46,9 +48,6 @@ MIN_CHARGER_UPDATE_DELAY: int = 30
 
 class EVSELoadBalancerCoordinator:
     """Coordinator for the EVSE Load Balancer."""
-
-    _hysteresis_buffer: dict[Phase, list[int]] = dict.fromkeys(Phase)
-    _hysteresis_start: dict[Phase, int | None] = dict.fromkeys(Phase)
 
     _last_check_timestamp: str = None
 
@@ -91,6 +90,13 @@ class EVSELoadBalancerCoordinator:
         )
         self._unsub.append(
             self.config_entry.add_update_listener(self._handle_options_update)
+        )
+
+        self._balancer_algo = OptimisedLoadBalancer(
+            recovery_window=of.EvseLoadBalancerOptionsFlow.get_option_value(
+                self.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
+            )
+            * 60
         )
 
     async def async_unload(self) -> None:
@@ -151,7 +157,7 @@ class EVSELoadBalancerCoordinator:
         return self._last_check_timestamp
 
     @callback
-    def _execute_update_cycle(self, _now: datetime) -> None:
+    def _execute_update_cycle(self, now: datetime) -> None:
         """Execute the update cycle for the charger."""
         self._last_check_timestamp = datetime.now().astimezone()
         available_currents = self._get_available_currents()
@@ -185,45 +191,19 @@ class EVSELoadBalancerCoordinator:
 
         # Run the actual charger update
         if self._should_check_charger():
-            new_charger_settings = current_charger_setting.copy()
-            for phase in Phase:
-                available_current = available_currents[phase]
-
-                new_charger_current = min(
-                    max_charger_current[phase],
-                    max(0, current_charger_setting[phase] + available_current),
-                )
-                if new_charger_current < current_charger_setting[phase]:
-                    # Immediately apply lower charger currents and
-                    # reset ongoing hysteresis
-                    new_charger_settings[phase] = new_charger_current
-                    self._reset_hysteresis(phase)
-                elif new_charger_current > current_charger_setting[phase]:
-                    # Delay an increase of charger currents to
-                    # prevent continuous fluctuations
-                    normalized_value = self._apply_phase_hysteresis(
-                        phase, new_charger_current
-                    )
-                    if normalized_value is not None:
-                        new_charger_settings[phase] = normalized_value
-
+            new_charger_settings = self._balancer_algo.compute_new_limits(
+                current_limits=current_charger_setting,
+                available_currents=available_currents,
+                max_limits=max_charger_current,
+                now=now.timestamp(),
+            )
             # Update the charger with the new settings
             has_changed_values = any(
                 new_charger_settings[phase] is not current_charger_setting[phase]
                 for phase in new_charger_settings
             )
             if has_changed_values and self._may_update_charger_settings():
-                _LOGGER.debug("New charger settings: %s", new_charger_settings)
-                self._last_charger_target_update = (
-                    new_charger_settings,
-                    int(time()),
-                )
-                self._emit_charger_event(
-                    EVENT_ACTION_NEW_CHARGER_LIMITS, new_charger_settings
-                )
-                self.hass.async_create_task(
-                    self._charger.set_current_limit(new_charger_settings)
-                )
+                self._update_charger_settings(new_charger_settings)
 
     def _async_update_sensors(self) -> None:
         for sensor in self._sensors:
@@ -232,35 +212,7 @@ class EVSELoadBalancerCoordinator:
 
     def _should_check_charger(self) -> bool:
         """Check if the charger should be checked for current limit changes."""
-        return self._charger.can_charge()
-
-    def _apply_phase_hysteresis(
-        self, phase: Phase, available_current: int
-    ) -> int | None:
-        """Apply hysteresis to the current limit for a given phase."""
-        now = int(time())
-        if self._hysteresis_start[phase] is None:
-            self._hysteresis_start[phase] = now
-            self._hysteresis_buffer[phase] = []
-
-        buffer = self._hysteresis_buffer[phase]
-        start_time = self._hysteresis_start[phase]
-
-        buffer.append(available_current)
-        elapsed_min = (now - start_time) / 60
-
-        if elapsed_min >= of.EvseLoadBalancerOptionsFlow.get_option_value(
-            self.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
-        ):
-            smoothened_current = int(median(self._hysteresis_buffer[phase]))
-            self._reset_hysteresis(phase)
-            return smoothened_current
-
-        return None
-
-    def _reset_hysteresis(self, phase: Phase) -> None:
-        self._hysteresis_start[phase] = None
-        self._hysteresis_buffer[phase] = []
+        return True  # self._charger.can_charge()
 
     def _may_update_charger_settings(self) -> bool:
         """Check if the charger settings haven't been updated too recently."""
@@ -278,6 +230,15 @@ class EVSELoadBalancerCoordinator:
             int(time()),
         )
         return False
+
+    def _update_charger_settings(self, new_limits: dict[Phase, int]) -> None:
+        _LOGGER.debug("New charger settings: %s", new_limits)
+        self._last_charger_target_update = (
+            new_limits,
+            int(time()),
+        )
+        self._emit_charger_event(EVENT_ACTION_NEW_CHARGER_LIMITS, new_limits)
+        self.hass.async_create_task(self._charger.set_current_limit(new_limits))
 
     def _emit_charger_event(self, action: str, new_limits: dict[Phase, int]) -> None:
         """Emit an event to Home Assistant's device event log."""

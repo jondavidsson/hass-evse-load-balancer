@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 # Number of seconds between each check cycle
-EXECUTION_CYCLE_DELAY: int = 3
+EXECUTION_CYCLE_DELAY: int = 1
 
 # Number of seconds between each charger update. This setting
 # makes sure that the charger is not updated too frequently and
@@ -179,12 +179,6 @@ class EVSELoadBalancerCoordinator:
                 "Max charger current is not available. Cannot adjust limit."
             )
             return
-
-        _LOGGER.debug(
-            "Charger current available: %s, charger: %s",
-            available_currents,
-            current_charger_setting,
-        )
 
         # making data available to sensors
         self._async_update_sensors()

@@ -1,8 +1,23 @@
 [![easee_hass](https://img.shields.io/github/release/dirkgroenen/hass-evse-load-balancer.svg?1)](https://github.com/dirkgroenen/hass-evse-load-balancer) ![Validate with hassfest](https://github.com/dirkgroenen/hass-evse-load-balancer/workflows/Validate%20with%20Hassfest%20and%20HACS/badge.svg) ![Maintenance](https://img.shields.io/maintenance/yes/2025.svg) [![Easee_downloads](https://img.shields.io/github/downloads/dirkgroenen/hass-evse-load-balancer/total)](https://github.com/dirkgroenen/hass-evse-load-balancer) [![easee_hass_downloads](https://img.shields.io/github/downloads/dirkgroenen/hass-evse-load-balancer/latest/total)](https://github.com/dirkgroenen/hass-evse-load-balancer)
 
-# EVSE Load Balancer for Home Assistant
 
-**EVSE Load Balancer** is an integration for [Home Assistant](https://www.home-assistant.io/) that provides a universal load balancing solution for electric vehicle (EV) chargers. It eliminates the need for additional vendor-specific hardware (and endless P1-port device clutter) by leveraging existing energy meters and sensors in your Home Assistant setup.
+# EVSE Load Balancer for Home Assistant 🚗⚡️ 
+
+**EVSE Load Balancer** is an integration for [Home Assistant](https://www.home-assistant.io/) that provides a **universal load balancing solution for electric vehicle (EV) chargers**. It eliminates the need for additional vendor-specific hardware (and endless P1-port device clutter) by leveraging existing energy meters and sensors in your Home Assistant setup.
+
+- No more need of custom automation scripts trying to protect your main fuse 
+- No more additional hardware on your P1 port.
+
+## Table of Contents
+
+- [Features](#features)
+- [Roadmap](#roadmap)
+- [Supported Devices](#supported-devices)
+- [How It Works](#how-it-works)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Events and Logging](#events-and-logging)
+- [Contributing](#contributing)
 
 ## Features
 
@@ -14,6 +29,16 @@
 
 - **Force PV Usage**: Introduce an option to prioritize the use of produced power (e.g., solar PV) for charging the EV, minimizing grid dependency.
 - **Dynamic Tariff-Based Charging**: Enable the creation of charge plans that optimize charging times based on dynamic electricity tariffs, ensuring charging occurs at the lowest possible cost.
+
+## Supported Devices
+
+### Energy Meters
+- DSMR-compatible meters (via [DSMR Smart Meter](https://www.home-assistant.io/integrations/dsmr/))
+- Custom configurations using existing Home Assistant sensors (1-3 Phase support)
+
+### EV Chargers
+- Easee Chargers (via [nordicopen/easee_hass](https://github.com/nordicopen/easee_hass))
+- ... additional chargers to be added ...
 
 ## How It Works
 
@@ -33,16 +58,6 @@ Key parts of the process include:
   All calculations are performed separately for each electrical phase, ensuring that the load is balanced and your circuit remains safe under varying conditions. The ability to make use of this depends on your charger's capabilities though.
 
 This adaptive approach allows the EVSE Load Balancer to optimize charging power while preventing overloads, making the most of your available energy, putting the least amount of stress on your charger, car and circuit breaker. 
-
-## Supported Devices
-
-### Energy Meters
-- DSMR-compatible meters (via [DSMR Smart Meter](https://www.home-assistant.io/integrations/dsmr/))
-- Custom configurations using existing Home Assistant sensors (1-3 Phase support)
-
-### EV Chargers
-- Easee Chargers (via [nordicopen/easee_hass](https://github.com/nordicopen/easee_hass))
-- ... additional chargers to be added ...
 
 ## Installation
 

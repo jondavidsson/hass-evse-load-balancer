@@ -206,7 +206,7 @@ class EVSELoadBalancerCoordinator:
 
     def _should_check_charger(self) -> bool:
         """Check if the charger should be checked for current limit changes."""
-        return True  # self._charger.can_charge()
+        return self._charger.can_charge()
 
     def _may_update_charger_settings(self) -> bool:
         """Check if the charger settings haven't been updated too recently."""

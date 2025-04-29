@@ -28,7 +28,10 @@ class CustomMeter(Meter):
 
     def get_active_phase_current(self, phase: Phase) -> int | None:
         """Return available current on a given phase."""
-        phase_config = self._config_entry_data[PHASE_CONF_MAP[phase]]
+        phase_config = self._config_entry_data.get(PHASE_CONF_MAP[phase], None)
+        if phase_config is None:
+            return None
+
         active_power = self.get_active_phase_power(phase)
         voltage_state = self._get_state(phase_config[cf.CONF_PHASE_SENSOR_VOLTAGE])
         if None in [active_power, voltage_state]:

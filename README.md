@@ -23,7 +23,7 @@
 
 - **Dynamic Load Balancing**: Automatically adjusts the charging current of your EV charger based on the available power in your home.
 - **Broad Meter Support**: Works with DSMR-compatible meters or allows manual configuration based on existing entities for advanced setups.
-- **Flexible Charger Integration**: Compatible with a range of EV chargers, such as Easee.
+- **Flexible Charger Integration**: Compatible with a range of EV chargers, such as Easee, Zaptec, ....
 
 ### Roadmap
 
@@ -32,12 +32,17 @@
 
 ## Supported Devices
 
+> **⚠️ Important notice:** I can personally only test the DSMR and Easee integration. Support 
+> from the community is well appreciated to test other chargers and make contributions where required.
+> Chargers and meters are implemented with best-effort, but often purely based on API documentation and available code.
+
 ### Energy Meters
 - DSMR-compatible meters (via [DSMR Smart Meter](https://www.home-assistant.io/integrations/dsmr/))
 - Custom configurations using existing Home Assistant sensors (1-3 Phase support)
 
 ### EV Chargers
 - Easee Chargers (via [nordicopen/easee_hass](https://github.com/nordicopen/easee_hass))
+- Zaptec Chargers (via [custom-components/zaptec](https://github.com/custom-components/zaptec))
 - ... additional chargers to be added ...
 
 ## How It Works

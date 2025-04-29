@@ -1,0 +1,148 @@
+"""Zaptec Charger implementation."""
+
+import logging
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntry
+
+from ..const import CHARGER_DOMAIN_ZAPTEC  # noqa: TID252
+from ..ha_device import HaDevice  # noqa: TID252
+from ..meters.meter import Phase  # Use the correct import path  # noqa: TID252
+from .charger import Charger, PhaseMode
+
+_LOGGER = logging.getLogger(__name__)
+
+# Constants for the Zaptec integration
+
+ZAPTEC_SERVICE_LIMIT_CURRENT = "limit_current"
+
+
+class ZaptecEntityMap:
+    """Map of Zaptec entity translation keys."""
+
+    ChargingCurrent = "charger_max_current"
+    MaxChargingCurrent = "available_current"
+    Status = "operating_mode"
+
+
+class ZaptecStatusMap:
+    """
+    Map of Zaptec charger statuses.
+
+    See https://github.com/custom-components/zaptec/blob/master/custom_components/zaptec/sensor.py#L43
+    """
+
+    Unknown = "Unknown"
+    Disconnected = "Disconnected"
+    ConnectedRequesting = "Connected_Requesting"
+    ConnectedCharging = "Connected_Charging"
+    ConnectedFinished = "Connected_Finished"
+
+
+class ZaptecCharger(HaDevice, Charger):
+    """Implementation of the Charger class for Zaptec chargers."""
+
+    def __init__(
+        self, hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
+    ) -> None:
+        """Initialize the Zaptec charger."""
+        HaDevice.__init__(self, hass, device_entry)
+        Charger.__init__(self, hass, config_entry, device_entry)
+        self.refresh_entities()
+
+    def set_phase_mode(self, mode: PhaseMode, _phase: Phase) -> None:
+        """Set the phase mode of the charger."""
+        if mode not in PhaseMode:
+            msg = "Invalid mode. Must be 'single' or 'multi'."
+            raise ValueError(msg)
+
+        # TODO(Dirk): Implement the logic to set the phase mode for Easee # noqa: FIX002
+        # chargers.
+        # https://github.com/dirkgroenen/hass-evse-load-balancer/issues/9
+
+    async def set_current_limit(self, limit: dict[Phase, int]) -> None:
+        """Set the current limit for the Zaptec charger."""
+        entity_id = self._get_entity_id_by_translation_key(
+            ZaptecEntityMap.ChargingCurrent
+        )
+        await self.hass.services.async_call(
+            domain=CHARGER_DOMAIN_ZAPTEC,
+            service=ZAPTEC_SERVICE_LIMIT_CURRENT,
+            service_data={
+                "device_id": entity_id,
+                "value": int(min(limit.values())),
+            },
+            blocking=True,
+        )
+
+    def get_current_limit(self) -> dict[Phase, int] | None:
+        """Get the current limit set on the charger."""
+        entity_state = self._get_entity_state_by_translation_key(
+            ZaptecEntityMap.ChargingCurrent
+        )
+
+        try:
+            # Zaptec returns the same value for all phases
+            current_value = int(entity_state)
+            return dict.fromkeys(Phase, current_value)
+        except (ValueError, TypeError):
+            _LOGGER.exception(
+                "Could not convert current limit '%s' to number", entity_state
+            )
+            return None
+
+    def get_max_current_limit(self) -> dict[Phase, int] | None:
+        """Return maximum configured current for the charger."""
+        state = self._get_entity_state_by_translation_key(
+            ZaptecEntityMap.MaxChargingCurrent
+        )
+        if state is None:
+            _LOGGER.warning(
+                (
+                    "Max charger limit not available. "
+                    "Make sure the required entity (%s) is enabled"
+                ),
+                ZaptecEntityMap.MaxChargingCurrent,
+            )
+            return None
+
+        try:
+            # Zaptec returns the same max value for all phases
+            max_value = int(float(state))
+        except (ValueError, TypeError):
+            _LOGGER.exception("Could not convert max current '%s' to number", state)
+            return None
+
+        return {
+            Phase.L1: max_value,
+            Phase.L2: max_value,
+            Phase.L3: max_value,
+        }
+
+    def _get_status(self) -> str | None:
+        """Get the current status of the charger."""
+        return self._get_entity_state_by_translation_key(ZaptecEntityMap.Status)
+
+    def car_connected(self) -> bool:
+        """Check if a car is connected to the charger."""
+        # Fall back to status-based detection
+        status = self._get_status()
+        return status in (
+            ZaptecStatusMap.ConnectedRequesting,
+            ZaptecStatusMap.ConnectedCharging,
+            ZaptecStatusMap.ConnectedFinished,
+        )
+
+    def can_charge(self) -> bool:
+        """Check if the charger is in a state where it can charge."""
+        # First check if car is connected
+        if not self.car_connected():
+            return False
+
+        # Then check status to see if it's in a state where charging is possible
+        status = self._get_status()
+        return status in (
+            ZaptecStatusMap.ConnectedCharging,
+            ZaptecStatusMap.ConnectedFinished,
+        )

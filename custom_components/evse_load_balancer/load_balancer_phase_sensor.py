@@ -42,6 +42,7 @@ class LoadBalancerPhaseSensor(LoadBalancerSensor):
         """Return the available current from the coordinator."""
         if self.entity_description.device_class == SensorDeviceClass.CURRENT:
             return self._coordinator.get_available_current_for_phase(self._phase)
+
         _LOGGER.error(
             (
                 f"Cant get sensor value. Sensor {self.entity_description.key}",

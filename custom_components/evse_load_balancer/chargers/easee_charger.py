@@ -61,7 +61,9 @@ class EaseeCharger(HaDevice, Charger):
         if mode not in PhaseMode:
             msg = "Invalid mode. Must be 'single' or 'multi'."
             raise ValueError(msg)
-        # Implement the logic to set the phase mode for Easee chargers
+        # TODO(Dirk): Implement the logic to set the phase mode for Easee # noqa: FIX002
+        # chargers.
+        # https://github.com/dirkgroenen/hass-evse-load-balancer/issues/9
 
     async def set_current_limit(self, limit: dict[Phase, int]) -> None:
         """

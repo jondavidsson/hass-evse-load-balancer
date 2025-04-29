@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from functools import cached_property
 from math import floor
 from time import time
 from typing import TYPE_CHECKING
@@ -79,8 +80,6 @@ class EVSELoadBalancerCoordinator:
 
     async def async_setup(self) -> None:
         """Set up the coordinator."""
-        tracked_entities = self._meter.get_tracking_entities()
-        _LOGGER.debug("Tracking entities: %s", tracked_entities)
         self._unsub.append(
             async_track_time_interval(
                 self.hass,
@@ -130,7 +129,8 @@ class EVSELoadBalancerCoordinator:
     def _get_available_currents(self) -> dict[Phase, int] | None:
         """Check all phases and return the available current."""
         available_currents = {
-            phase: self.get_available_current_for_phase(phase) for phase in Phase
+            phase: self.get_available_current_for_phase(phase)
+            for phase in self._available_phases
         }
         if None in available_currents.values():
             _LOGGER.error(
@@ -138,6 +138,12 @@ class EVSELoadBalancerCoordinator:
             )
             return None
         return available_currents
+
+    @cached_property
+    def _available_phases(self) -> list[Phase]:
+        """Get the available phases based on the user's configuration."""
+        phase_count = int(self.config_entry.data.get(cf.CONF_PHASE_COUNT, 3))
+        return list(Phase)[:phase_count]
 
     @property
     def fuse_size(self) -> float:

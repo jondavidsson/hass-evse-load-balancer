@@ -1,6 +1,11 @@
 {
   "domain": "evse_load_balancer",
   "name": "EVSE Load Balancer",
+  "after_dependencies": [
+    "sensor",
+    "easee",
+    "dsmr"
+  ],
   "codeowners": [
     "@dirkgroenen"
   ],

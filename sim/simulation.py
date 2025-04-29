@@ -4,6 +4,7 @@ Simulation of the balancers for EVSE Load Balancing.
 Use it to test and simulate the working of the balancer, based on a
 short snippet of real-world data.
 """
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -23,9 +24,7 @@ MAX_CHARGE_CURRENT_PER_PHASE = 16.0  # Maximum per-phase current
 
 # Inladen van data
 df_final_selected = pd.read_csv(
-    Path.resolve(
-        Path(__file__).parent / "simulation_data.csv"
-    ),
+    Path.resolve(Path(__file__).parent / "simulation_data.csv"),
     index_col="last_changed",
     parse_dates=True,
 )

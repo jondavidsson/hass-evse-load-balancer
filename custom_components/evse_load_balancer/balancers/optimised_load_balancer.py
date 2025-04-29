@@ -57,9 +57,8 @@ class OptimisedLoadBalancer(Balancer):
         """Compute new charger limits."""
         new_limits = {}
         elapsed = now - self._last_compute
-        for phase in Phase:
+        for phase, avail in available_currents.items():
             current_limit = current_limits[phase]
-            avail = available_currents[phase]
             max_limit = max_limits[phase]
             new_target = current_limit
 

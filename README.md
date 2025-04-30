@@ -8,6 +8,13 @@
 - No more need of custom automation scripts trying to protect your main fuse 
 - No more additional hardware on your P1 port.
 
+---
+
+> **⚠️ Looking for early adopters:** who can help me test the component, extend its capabilities and provide feedback.
+> Feel free to share your feedback in the [Home Assistant Community](https://community.home-assistant.io/t/evse-load-balancer-a-universal-load-balancer-for-your-ev-chargers/883863), or via Github. 
+
+---
+
 ## Table of Contents
 
 - [Features](#features)

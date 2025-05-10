@@ -17,6 +17,18 @@ SUPPORTED_CHARGER_DEVICE_DOMAINS = (
     HA_INTEGRATION_DOMAIN_MQTT,
 )
 
+POSSIBLE_CHARGER_EV_STATUSES = [
+    "disconnected",
+    "connected",
+    "charging",
+    "error",
+    "ready_to_charge",
+    "paused",
+    "resuming_charge",
+    "unknown",
+    "Not Connected",
+]
+
 METER_DOMAIN_DSMR = "dsmr"
 SUPPORTED_METER_DEVICE_DOMAINS = (METER_DOMAIN_DSMR,)
 

@@ -285,3 +285,20 @@ class AminaCharger(Charger):
         # "ready_to_charge", "paused", "resuming_charge".
         # "Not Connected" såg vi i en tidigare dump, vilket troligen motsvarar "disconnected".
         return ev_status.lower() in ("charging", "ready_to_charge", "resuming_charge")
+    
+    def get_ev_status(self) -> str | None:
+        """
+        Get the raw EV status string from the internal cache.
+        This method will be called by the coordinator to update a sensor.
+        """
+        if not self._is_mqtt_setup_done:
+            _LOGGER.warning(
+                f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up, "
+                f"get_ev_status from cache may be stale."
+            )
+            # Return the cached value anyway, or None, or the default "unknown"
+            # Depending on how you want sensors to behave if MQTT is down.
+            # Returning the cached value (even if potentially stale with a warning) is often acceptable.
+        current_status = self._state_cache.get(Z2M_PROPERTY_EV_STATUS)
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': get_ev_status returning: {current_status}")
+        return current_status

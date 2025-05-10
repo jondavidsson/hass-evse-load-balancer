@@ -231,6 +231,33 @@ class EVSELoadBalancerCoordinator:
     def get_last_check_timestamp(self) -> str | None: # Ensure type hint matches attribute
         """Get the timestamp of the last check cycle."""
         return self._last_check_timestamp
+    
+    @property
+    def charger_is_car_connected(self) -> bool | None:
+        """Get the car connected state from the managed charger."""
+        if self._charger:
+            try:
+                return self._charger.car_connected()
+            except Exception as e:
+                _LOGGER.error(f"Error getting car_connected from charger: {e}")
+                return None
+        _LOGGER.debug("Charger instance not available in coordinator for charger_is_car_connected")
+        return None
+
+    @property
+    def charger_ev_status(self) -> str | None:
+        """Get the raw EV status string from the managed charger."""
+        if self._charger:
+            if hasattr(self._charger, "get_ev_status") and callable(
+                getattr(self._charger, "get_ev_status")
+            ):
+                try:
+                    return self._charger.get_ev_status()
+                except Exception as e:
+                    _LOGGER.error(f"Error getting ev_status from charger's get_ev_status method: {e}")
+                    return None
+        _LOGGER.debug("Charger instance not available in coordinator for charger_ev_status")
+        return None
 
     @callback
     def _execute_update_cycle(self, now: datetime) -> None: # 'now' is the current time, passed by async_track_time_interval

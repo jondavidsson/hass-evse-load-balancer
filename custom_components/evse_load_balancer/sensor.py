@@ -12,6 +12,7 @@ from homeassistant.components.sensor import (
 from .const import (
     COORDINATOR_STATES,
     DOMAIN,
+    POSSIBLE_CHARGER_EV_STATUSES,  # <<< LÄGG TILL DENNA IMPORT
 )
 from .coordinator import EVSELoadBalancerCoordinator
 from .load_balancer_phase_sensor import (
@@ -84,6 +85,29 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
             device_class=SensorDeviceClass.CURRENT,
             suggested_display_precision=0,
             entity_registry_enabled_default=False,
+        ),
+    ),
+    (
+        LoadBalancerSensor,
+        SensorEntityDescription(
+            key="charger_is_car_connected",  # This key must match the property name in the coordinator
+            name="Car Connected",     # User-friendly name for this sensor
+            icon="mdi:power-plug-outline",   # Suggests an icon related to connectivity
+            entity_registry_enabled_default=True, # Enable by default, or set to False
+            # No device_class here means it will likely show True/False or on/off.
+            # If you wanted this as a binary_sensor, it would need to be in binary_sensor.py
+            # and use BinarySensorDeviceClass.CONNECTIVITY.
+        ),
+    ),
+    (
+        LoadBalancerSensor,
+        SensorEntityDescription(
+            key="charger_ev_status",        # This key must match the property name in the coordinator
+            name="Charger EV Status",       # User-friendly name for this sensor
+            device_class=SensorDeviceClass.ENUM,
+            options=POSSIBLE_CHARGER_EV_STATUSES, # Use the list of possible statuses from const.py
+            icon="mdi:ev-station",          # Suggests an icon related to EV charging status
+            entity_registry_enabled_default=True, # Enable by default, or set to False
         ),
     ),
 )

@@ -88,7 +88,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator: EVSELoadBalancerCoordinator = hass.data[DOMAIN].get(entry.entry_id)
     
     if coordinator:
-        charger_instance = coordinator.charger # Assuming the coordinator has a reference to the charger instance
+        charger_instance = coordinator._charger
 
         # --- SECTION for MQTT based charger unload ---
         # Check if the charger instance has an async_unload_mqtt method

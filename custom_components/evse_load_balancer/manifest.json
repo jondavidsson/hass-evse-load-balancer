@@ -6,7 +6,8 @@
     "easee",
     "dsmr",
     "mqtt",
-    "zigbee2mqtt"
+    "zigbee2mqtt",
+    "esphome"
   ],
   "codeowners": [
     "@dirkgroenen"

@@ -6,7 +6,29 @@ DOMAIN = "evse_load_balancer"
 
 CHARGER_DOMAIN_EASEE = "easee"
 CHARGER_DOMAIN_ZAPTEC = "zaptec"
-SUPPORTED_CHARGER_DEVICE_DOMAINS = (CHARGER_DOMAIN_EASEE, CHARGER_DOMAIN_ZAPTEC)
+
+HA_INTEGRATION_DOMAIN_MQTT = "mqtt"
+Z2M_DEVICE_IDENTIFIER_DOMAIN = "zigbee2mqtt"
+MANUFACTURER_AMINA = "Amina Distribution AS"
+
+SUPPORTED_CHARGER_DEVICE_DOMAINS = (
+    CHARGER_DOMAIN_EASEE,
+    CHARGER_DOMAIN_ZAPTEC,
+    HA_INTEGRATION_DOMAIN_MQTT,
+)
+
+POSSIBLE_CHARGER_EV_STATUSES = [
+    "Not Connected",
+    "EV Connected",
+    "Ready to charge",
+    "Charging",
+    "Charging Paused",
+    "EV Connected, Derated",
+    "Ready to charge, Derated",
+    "Charging, Derated",
+    "Charging Paused, Derated",
+    "unknown",
+]
 
 METER_DOMAIN_DSMR = "dsmr"
 SUPPORTED_METER_DEVICE_DOMAINS = (METER_DOMAIN_DSMR,)

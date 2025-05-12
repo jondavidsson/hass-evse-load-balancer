@@ -4,7 +4,10 @@
   "after_dependencies": [
     "sensor",
     "easee",
-    "dsmr"
+    "dsmr",
+    "mqtt",
+    "zigbee2mqtt",
+    "esphome"
   ],
   "codeowners": [
     "@dirkgroenen"

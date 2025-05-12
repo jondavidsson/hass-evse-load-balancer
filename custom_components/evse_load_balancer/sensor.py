@@ -12,6 +12,7 @@ from homeassistant.components.sensor import (
 from .const import (
     COORDINATOR_STATES,
     DOMAIN,
+    POSSIBLE_CHARGER_EV_STATUSES,
 )
 from .coordinator import EVSELoadBalancerCoordinator
 from .load_balancer_phase_sensor import (
@@ -83,6 +84,26 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
             key=SENSOR_KEY_AVAILABLE_CURRENT_L3,
             device_class=SensorDeviceClass.CURRENT,
             suggested_display_precision=0,
+            entity_registry_enabled_default=False,
+        ),
+    ),
+    (
+        LoadBalancerSensor,
+        SensorEntityDescription(
+            key="charger_is_car_connected",  # This key must match the property name in the coordinator
+            name="Car Connected",     # User-friendly name for this sensor
+            icon="mdi:power-plug-outline",   # Suggests an icon related to connectivity
+            entity_registry_enabled_default=False,
+        ),
+    ),
+    (
+        LoadBalancerSensor,
+        SensorEntityDescription(
+            key="charger_ev_status",
+            name="Charger EV Status",
+            device_class=SensorDeviceClass.ENUM,
+            options=POSSIBLE_CHARGER_EV_STATUSES,
+            icon="mdi:ev-station",
             entity_registry_enabled_default=False,
         ),
     ),

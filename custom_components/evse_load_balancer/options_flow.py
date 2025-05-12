@@ -33,22 +33,12 @@ async def validate_init_input(
 class EvseLoadBalancerOptionsFlow(OptionsFlow):
     """Handle an options flow for evse-load-balancer."""
 
-    # MODIFIED: __init__ no longer takes config_entry as an argument.
-    # Home Assistant core will set self.config_entry after initialization for HA >= 2024.11
-    def __init__(self) -> None:
+    def __init__(self, config_entry: ConfigEntry | None = None) -> None: # MODIFIED for robustness
         """Initialize options flow."""
-        # self.config_entry is set by HA core if HA version >= 2024.11
-        # For older versions, the config_flow.py's async_get_options_flow
-        # passes it if needed: EvseLoadBalancerOptionsFlow(config_entry=config_entry)
-        # However, to support the new way, __init__ should not require it.
-        # If this OptionsFlow is *only* for HA >= 2024.11 (based on your config_flow.py logic),
-        # then self.config_entry will be available in other methods like _options_schema.
-        # If this __init__ is also called by the <2024.11 path in config_flow.py,
-        # then config_flow.py should handle setting self.config_entry on the instance it creates.
-        # The change in config_flow.py's async_get_options_flow makes sure to pass it for older HA.
-        # For newer HA, self.config_entry is automatically populated.
-        pass
-
+        if config_entry is not None:
+            self.config_entry = config_entry
+        # If config_entry is None (e.g. called by HA >= 2024.11 path), 
+        # HA core will set self.config_entry on the instance.
 
     @staticmethod
     def get_option_value(config_entry: ConfigEntry, key: str) -> Any:
@@ -57,8 +47,7 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
 
     def _options_schema(self) -> vol.Schema:
         """Define the schema for the options flow."""
-        # self.config_entry is available here, set by HA core or by the older path in async_get_options_flow
-        options_values = self.config_entry.options
+        options_values = self.config_entry.options # self.config_entry should be set by now
         
         main_fuse_size_from_config_data = self.config_entry.data.get("fuse_size", 32) 
 
@@ -86,8 +75,8 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                     ),
                 ): NumberSelector(
                     {
-                        "min": 0,
-                        "max": main_fuse_size_from_config_data,
+                        "min": 0, 
+                        "max": main_fuse_size_from_config_data, 
                         "step": 1,
                         "mode": "box",
                         "unit_of_measurement": "A",
@@ -105,15 +94,16 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
             processed_input = user_input.copy()
             try:
                 if OPTION_MAX_FUSE_LOAD_AMPS in processed_input and processed_input[OPTION_MAX_FUSE_LOAD_AMPS] is not None:
-                    processed_input[OPTION_MAX_FUSE_LOAD_AMPS] = int(processed_input[OPTION_MAX_FUSE_LOAD_AMPS])
+                    # Ensure it's an int, NumberSelector should provide float/int but form gives str
+                    processed_input[OPTION_MAX_FUSE_LOAD_AMPS] = int(float(processed_input[OPTION_MAX_FUSE_LOAD_AMPS]))
 
                 # self.hass is available in OptionsFlow handlers
                 input_data = await validate_init_input(self.hass, processed_input) 
             
             except ValidationExceptionError as ex:
                 errors[ex.base] = ex.key
-            except ValueError: 
-                errors["base"] = "invalid_number_format" 
+            except ValueError: # Catch potential ValueError from int(float(...)) conversion
+                errors["base"] = "invalid_number_format" # Define this error key in strings.json
             
             if not errors:
                 return self.async_create_entry(title="", data=input_data)

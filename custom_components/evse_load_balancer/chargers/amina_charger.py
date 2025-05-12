@@ -42,7 +42,7 @@ class AminaCharger(Charger):
         super().__init__(hass, config_entry, device)
         
         self._z2m_friendly_name: str = device.name 
-        _LOGGER.info(f"AminaCharger: Initializing with Z2M friendly name: '{self._z2m_friendly_name}' from device.name") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger: Initializing with Z2M friendly name: '{self._z2m_friendly_name}' from device.name") # ADDED LOG
         if not self._z2m_friendly_name:
             _LOGGER.error("AminaCharger: Z2M friendly name is empty or None!") # Ensure this is an error
             raise ValueError("Cannot initialize AminaCharger: Zigbee2MQTT friendly name is missing.")
@@ -63,7 +63,7 @@ class AminaCharger(Charger):
 
     async def async_setup_mqtt(self) -> None:
         """Subscribe to MQTT topics and request initial state. Called after __init__."""
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': Entered async_setup_mqtt. Current _is_mqtt_setup_done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': Entered async_setup_mqtt. Current _is_mqtt_setup_done: {self._is_mqtt_setup_done}") # ADDED LOG
         if self._is_mqtt_setup_done:
             _LOGGER.warning(f"AminaCharger {self._z2m_friendly_name}: MQTT setup already performed.")
             return
@@ -74,7 +74,7 @@ class AminaCharger(Charger):
         @ha_core_callback
         def message_received(msg) -> None:
             """Handle new MQTT messages from the device's state topic."""
-            _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': MQTT RAW message received on {msg.topic}. Payload: {msg.payload}") # CHANGED TO INFO for visibility
+            _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': MQTT RAW message received on {msg.topic}. Payload: {msg.payload}") # CHANGED TO INFO for visibility
             try:
                 payload_json = json.loads(msg.payload)
                 _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': Parsed payload: {payload_json}")
@@ -91,15 +91,15 @@ class AminaCharger(Charger):
                         
                         self._state_cache[key] = processed_value
                         if original_cached_value != processed_value:
-                            _LOGGER.info(f"AminaCharger {self._z2m_friendly_name}: Cache UPDATED for '{key}': from '{original_cached_value}' to '{processed_value}' (raw MQTT value: '{value}')") # CHANGED TO INFO
+                            _LOGGER.debug(f"AminaCharger {self._z2m_friendly_name}: Cache UPDATED for '{key}': from '{original_cached_value}' to '{processed_value}' (raw MQTT value: '{value}')") # CHANGED TO INFO
                         else:
                             _LOGGER.debug(f"AminaCharger {self._z2m_friendly_name}: Cache for '{key}' re-confirmed to '{processed_value}' (raw MQTT value: '{value}')")
                         
                         # Specifically log ev_status and ev_connected if found
                         if key == Z2M_PROPERTY_EV_STATUS:
-                             _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': EV_STATUS found in payload and cached: '{processed_value}'")
+                             _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': EV_STATUS found in payload and cached: '{processed_value}'")
                         if key == Z2M_PROPERTY_EV_CONNECTED:
-                             _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': EV_CONNECTED found in payload and cached: '{processed_value}'")
+                             _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': EV_CONNECTED found in payload and cached: '{processed_value}'")
 
             except json.JSONDecodeError:
                 _LOGGER.error(f"AminaCharger {self._z2m_friendly_name}: Error decoding JSON from MQTT topic {msg.topic}: {msg.payload}", exc_info=True) # Added exc_info
@@ -112,7 +112,7 @@ class AminaCharger(Charger):
                 self.hass, self._topic_state, message_received, qos=0, encoding="utf-8"
             )
             self._mqtt_listeners.append(unsubscribe_state)
-            _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': SUCCESSFULLY subscribed to MQTT topic '{self._topic_state}'")
+            _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': SUCCESSFULLY subscribed to MQTT topic '{self._topic_state}'")
 
             properties_to_get = [
                 Z2M_PROPERTY_CHARGE_LIMIT, Z2M_PROPERTY_SINGLE_PHASE,
@@ -130,7 +130,7 @@ class AminaCharger(Charger):
             
             if all_gets_attempted_successfully:
                 self._is_mqtt_setup_done = True # Set only if sub and all GETs attempted (even if some GETs failed, sub is key)
-                _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': MQTT subscription active and initial GETs published. MQTT setup considered complete.")
+                _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': MQTT subscription active and initial GETs published. MQTT setup considered complete.")
             else:
                 # If GETs failed, subscription might still be active, but state incomplete.
                 # Decide if this constitutes a failed setup. For now, if sub worked, let's try.
@@ -146,12 +146,12 @@ class AminaCharger(Charger):
             _LOGGER.error(f"AminaCharger '{self._z2m_friendly_name}': CRITICAL FAILURE during MQTT setup (e.g., subscription failed): {e}", exc_info=True) # Added exc_info
             self._is_mqtt_setup_done = False 
         
-        _LOGGER.info(f"AminaCharger {self._z2m_friendly_name}: Exiting async_setup_mqtt. Final _is_mqtt_setup_done state: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger {self._z2m_friendly_name}: Exiting async_setup_mqtt. Final _is_mqtt_setup_done state: {self._is_mqtt_setup_done}") # ADDED LOG
 
 
     async def async_unload_mqtt(self) -> None:
         """Unsubscribe from MQTT topics when the integration is unloaded."""
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': Entered async_unload_mqtt. Current _is_mqtt_setup_done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': Entered async_unload_mqtt. Current _is_mqtt_setup_done: {self._is_mqtt_setup_done}") # ADDED LOG
         for unsubscribe in self._mqtt_listeners:
             try:
                 unsubscribe()
@@ -159,7 +159,7 @@ class AminaCharger(Charger):
                 _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': Error during MQTT unsubscribe: {e}")
         self._mqtt_listeners.clear()
         self._is_mqtt_setup_done = False
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': Exiting async_unload_mqtt. Final _is_mqtt_setup_done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': Exiting async_unload_mqtt. Final _is_mqtt_setup_done: {self._is_mqtt_setup_done}") # ADDED LOG
 
     def _publish_to_set_topic(self, payload_dict: dict[str, Any]) -> None:
         """Helper to publish a command to the Zigbee2MQTT /set topic from sync code."""
@@ -187,7 +187,7 @@ class AminaCharger(Charger):
 
     def set_phase_mode(self, mode: PhaseMode, phase: Phase) -> None:
         """Set the phase mode of the charger via MQTT."""
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': set_phase_mode called. Mode: {mode}. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': set_phase_mode called. Mode: {mode}. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
         if not self._is_mqtt_setup_done:
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up, cannot set phase mode.")
             return
@@ -199,14 +199,14 @@ class AminaCharger(Charger):
             value_to_set = False
         
         if value_to_set is not None:
-            _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': Setting {Z2M_PROPERTY_SINGLE_PHASE} to {value_to_set} (Mode: {mode}) via MQTT.")
+            _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': Setting {Z2M_PROPERTY_SINGLE_PHASE} to {value_to_set} (Mode: {mode}) via MQTT.")
             self._publish_to_set_topic({Z2M_PROPERTY_SINGLE_PHASE: value_to_set})
         else:
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': Unknown PhaseMode for set_phase_mode: {mode}")
 
     async def set_current_limit(self, limit: dict[Phase, int]) -> None:
         """Set the charger limit in amps via MQTT."""
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': set_current_limit called. Limit: {limit}. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': set_current_limit called. Limit: {limit}. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
         if not self._is_mqtt_setup_done:
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up, cannot set current limit.")
             return
@@ -230,7 +230,7 @@ class AminaCharger(Charger):
                 f"AminaCharger '{self._z2m_friendly_name}': Requested current {target_current}A clamped to {clamped_current}A."
             )
         
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': Setting {Z2M_PROPERTY_CHARGE_LIMIT} to {clamped_current}A via MQTT.")
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': Setting {Z2M_PROPERTY_CHARGE_LIMIT} to {clamped_current}A via MQTT.")
         await self._async_publish_to_set_topic({Z2M_PROPERTY_CHARGE_LIMIT: clamped_current})
 
     def get_current_limit(self) -> dict[Phase, int] | None:
@@ -239,7 +239,7 @@ class AminaCharger(Charger):
         current_limit_val = self._state_cache.get(Z2M_PROPERTY_CHARGE_LIMIT)
         is_single_phase = self._state_cache.get(Z2M_PROPERTY_SINGLE_PHASE, False)
         
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': get_current_limit called. MQTT setup done: {self._is_mqtt_setup_done}. Cached limit: {current_limit_val}, SinglePhase: {is_single_phase}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': get_current_limit called. MQTT setup done: {self._is_mqtt_setup_done}. Cached limit: {current_limit_val}, SinglePhase: {is_single_phase}") # ADDED LOG
 
         if not self._is_mqtt_setup_done: # Explicit check here for clarity before returning potentially stale/default data
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up; get_current_limit from cache may be stale (limit: {current_limit_val}, single_phase: {is_single_phase}).")
@@ -272,14 +272,14 @@ class AminaCharger(Charger):
     def car_connected(self) -> bool:
         """Return whether the car is connected, from internal cache."""
         connected = bool(self._state_cache.get(Z2M_PROPERTY_EV_CONNECTED, False))
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': car_connected returning: {connected}. MQTT setup done: {self._is_mqtt_setup_done}. Cache value: {self._state_cache.get(Z2M_PROPERTY_EV_CONNECTED)}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': car_connected returning: {connected}. MQTT setup done: {self._is_mqtt_setup_done}. Cache value: {self._state_cache.get(Z2M_PROPERTY_EV_CONNECTED)}") # ADDED LOG
         if not self._is_mqtt_setup_done: # Warning if MQTT not ready
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up; car_connected from cache may be stale.")
         return connected
 
     def can_charge(self) -> bool:
         """Return whether the car is connected and ready/accepting charge, from internal cache."""
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': can_charge called. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': can_charge called. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
         if not self._is_mqtt_setup_done:
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up; can_charge from cache may be stale.")
 
@@ -290,18 +290,18 @@ class AminaCharger(Charger):
 
         ev_status = str(self._state_cache.get(Z2M_PROPERTY_EV_STATUS, "unknown")).lower()
         # Original debug log was fine, let's make it info for now for easier spotting
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': can_charge check -> ev_status from cache: '{ev_status}' (original case: '{self._state_cache.get(Z2M_PROPERTY_EV_STATUS)}')")
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': can_charge check -> ev_status from cache: '{ev_status}' (original case: '{self._state_cache.get(Z2M_PROPERTY_EV_STATUS)}')")
         
         # Using the Z2M converter logic for positive states
         is_chargeable_status = ev_status in ("charging", "ready_to_charge") 
         # Removed "resuming_charge" as it wasn't in Z2M converter logic
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': can_charge returning {is_chargeable_status} based on ev_status '{ev_status}'.")
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': can_charge returning {is_chargeable_status} based on ev_status '{ev_status}'.")
         return is_chargeable_status
     
     def get_ev_status(self) -> str | None:
         """Get the raw EV status string from the internal cache."""
         current_status = self._state_cache.get(Z2M_PROPERTY_EV_STATUS)
-        _LOGGER.info(f"AminaCharger '{self._z2m_friendly_name}': get_ev_status returning: '{current_status}'. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
+        _LOGGER.debug(f"AminaCharger '{self._z2m_friendly_name}': get_ev_status returning: '{current_status}'. MQTT setup done: {self._is_mqtt_setup_done}") # ADDED LOG
         if not self._is_mqtt_setup_done:
             _LOGGER.warning(f"AminaCharger '{self._z2m_friendly_name}': MQTT not set up; get_ev_status from cache may be stale.")
         return current_status

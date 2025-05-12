@@ -33,12 +33,15 @@ async def validate_init_input(
 class EvseLoadBalancerOptionsFlow(OptionsFlow):
     """Handle an options flow for evse-load-balancer."""
 
-    def __init__(self, config_entry: ConfigEntry | None = None) -> None: # MODIFIED for robustness
+    def __init__(self, config_entry: ConfigEntry | None = None) -> None: # MODIFIED HERE
         """Initialize options flow."""
+        # This signature allows config_entry to be optional.
+        # If HA calls this with config_entry (older HA versions via your config_flow.py logic),
+        # it will be set.
+        # If HA calls this without arguments (newer HA versions), config_entry will be None here,
+        # and HA core will set self.config_entry on the instance later.
         if config_entry is not None:
             self.config_entry = config_entry
-        # If config_entry is None (e.g. called by HA >= 2024.11 path), 
-        # HA core will set self.config_entry on the instance.
 
     @staticmethod
     def get_option_value(config_entry: ConfigEntry, key: str) -> Any:
@@ -47,7 +50,8 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
 
     def _options_schema(self) -> vol.Schema:
         """Define the schema for the options flow."""
-        options_values = self.config_entry.options # self.config_entry should be set by now
+        # self.config_entry will be populated by HA before this method is used by a step
+        options_values = self.config_entry.options
         
         main_fuse_size_from_config_data = self.config_entry.data.get("fuse_size", 32) 
 
@@ -87,23 +91,22 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult: # MODIFIED: Correct return type hint
+    ) -> ConfigFlowResult: # Corrected return type hint
         """Handle the initial step."""
         errors: dict[str, str] = {}
         if user_input is not None:
             processed_input = user_input.copy()
             try:
                 if OPTION_MAX_FUSE_LOAD_AMPS in processed_input and processed_input[OPTION_MAX_FUSE_LOAD_AMPS] is not None:
-                    # Ensure it's an int, NumberSelector should provide float/int but form gives str
                     processed_input[OPTION_MAX_FUSE_LOAD_AMPS] = int(float(processed_input[OPTION_MAX_FUSE_LOAD_AMPS]))
 
-                # self.hass is available in OptionsFlow handlers
+                # self.hass is available in OptionsFlow step handlers
                 input_data = await validate_init_input(self.hass, processed_input) 
             
             except ValidationExceptionError as ex:
                 errors[ex.base] = ex.key
-            except ValueError: # Catch potential ValueError from int(float(...)) conversion
-                errors["base"] = "invalid_number_format" # Define this error key in strings.json
+            except ValueError: 
+                errors["base"] = "invalid_number_format"
             
             if not errors:
                 return self.async_create_entry(title="", data=input_data)

@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from ..const import (
+from ..const import (   # noqa: TID252
     CHARGER_DOMAIN_EASEE,
     SUPPORTED_CHARGER_DEVICE_DOMAINS,
     HA_INTEGRATION_DOMAIN_MQTT,

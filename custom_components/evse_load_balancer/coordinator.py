@@ -16,7 +16,6 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_interval
 
-# Assuming these are aliases for your local files
 from . import config_flow as cf
 from . import options_flow as of
 from .balancers.optimised_load_balancer import (
@@ -115,7 +114,7 @@ class EVSELoadBalancerCoordinator:
         )
 
         self._balancer_algo = OptimisedLoadBalancer(
-            recovery_window=of.EvseLoadBalancerOptionsFlow.get_option_value( 
+            recovery_window=of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
             )
             * 60
@@ -212,19 +211,19 @@ class EVSELoadBalancerCoordinator:
         return self._last_check_timestamp # Return the datetime object
     
     @property
-    def charger_is_car_connected(self) -> bool | None:
-        """Get the car connected state from the managed charger."""
+    def evse_ev_connected(self) -> bool | None:
+        """Get the EV connected state from the managed charger."""
         if self._charger:
             try:
                 return self._charger.car_connected()
             except Exception as e:
                 _LOGGER.error(f"Error getting car_connected from charger: {e}", exc_info=True) # Added exc_info
                 return None
-        _LOGGER.debug("Charger instance not available in coordinator for charger_is_car_connected")
+        _LOGGER.debug("Charger instance not available in coordinator for evse_ev_connected")
         return None
 
     @property
-    def charger_ev_status(self) -> str | None:
+    def evse_ev_status(self) -> str | None:
         """Get the raw EV status string from the managed charger."""
         if self._charger:
             if hasattr(self._charger, "get_ev_status") and callable(
@@ -235,7 +234,7 @@ class EVSELoadBalancerCoordinator:
                 except Exception as e:
                     _LOGGER.error(f"Error getting ev_status from charger's get_ev_status method: {e}", exc_info=True) # Added exc_info
                     return None
-        _LOGGER.debug("Charger instance not available in coordinator for charger_ev_status")
+        _LOGGER.debug("Charger instance not available in coordinator for evse_ev_status")
         return None
 
     @callback

@@ -90,17 +90,8 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
     (
         LoadBalancerSensor,
         SensorEntityDescription(
-            key="charger_is_car_connected",  # This key must match the property name in the coordinator
-            name="Car Connected",     # User-friendly name for this sensor
-            icon="mdi:power-plug-outline",   # Suggests an icon related to connectivity
-            entity_registry_enabled_default=False,
-        ),
-    ),
-    (
-        LoadBalancerSensor,
-        SensorEntityDescription(
-            key="charger_ev_status",
-            name="Charger EV Status",
+            key="evse_ev_status",
+            name="EV Status",
             device_class=SensorDeviceClass.ENUM,
             options=POSSIBLE_CHARGER_EV_STATUSES,
             icon="mdi:ev-station",

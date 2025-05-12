@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, OptionsFlow, ConfigFlowResult # Added ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, OptionsFlow, ConfigFlowResult
 from homeassistant.helpers.selector import NumberSelector
 
 from .exceptions.validation_exception import ValidationExceptionError 
@@ -33,13 +33,13 @@ async def validate_init_input(
 class EvseLoadBalancerOptionsFlow(OptionsFlow):
     """Handle an options flow for evse-load-balancer."""
 
-    def __init__(self, config_entry: ConfigEntry | None = None) -> None: # MODIFIED HERE
+    def __init__(self, config_entry: ConfigEntry | None = None) -> None:
         """Initialize options flow."""
         # This signature allows config_entry to be optional.
-        # If HA calls this with config_entry (older HA versions via your config_flow.py logic),
+        # If HA core calls this with config_entry (e.g. older HA via your config_flow.py),
         # it will be set.
-        # If HA calls this without arguments (newer HA versions), config_entry will be None here,
-        # and HA core will set self.config_entry on the instance later.
+        # If HA core calls this without arguments (e.g. HA >= 2024.11 via your config_flow.py),
+        # config_entry will be None here, and HA core will set self.config_entry on the instance.
         if config_entry is not None:
             self.config_entry = config_entry
 
@@ -50,9 +50,10 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
 
     def _options_schema(self) -> vol.Schema:
         """Define the schema for the options flow."""
-        # self.config_entry will be populated by HA before this method is used by a step
+        # self.config_entry should be populated by HA before this method is called by a step
         options_values = self.config_entry.options
         
+        # Default to 32A if "fuse_size" is not found in config_entry.data
         main_fuse_size_from_config_data = self.config_entry.data.get("fuse_size", 32) 
 
         return vol.Schema(
@@ -61,7 +62,7 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                     OPTION_CHARGE_LIMIT_HYSTERESIS,
                     default=options_values.get(
                         OPTION_CHARGE_LIMIT_HYSTERESIS,
-                        DEFAULT_VALUES[OPTION_CHARGE_LIMIT_HYSTERESIS],
+                        DEFAULT_VALUES.get(OPTION_CHARGE_LIMIT_HYSTERESIS, 15), # Safer default access
                     ),
                 ): NumberSelector(
                     {
@@ -75,7 +76,7 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                     OPTION_MAX_FUSE_LOAD_AMPS,
                     default=options_values.get(
                         OPTION_MAX_FUSE_LOAD_AMPS,
-                        DEFAULT_VALUES[OPTION_MAX_FUSE_LOAD_AMPS],
+                        DEFAULT_VALUES.get(OPTION_MAX_FUSE_LOAD_AMPS, 0), # Safer default access
                     ),
                 ): NumberSelector(
                     {
@@ -91,7 +92,7 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult: # Corrected return type hint
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -100,13 +101,12 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                 if OPTION_MAX_FUSE_LOAD_AMPS in processed_input and processed_input[OPTION_MAX_FUSE_LOAD_AMPS] is not None:
                     processed_input[OPTION_MAX_FUSE_LOAD_AMPS] = int(float(processed_input[OPTION_MAX_FUSE_LOAD_AMPS]))
 
-                # self.hass is available in OptionsFlow step handlers
                 input_data = await validate_init_input(self.hass, processed_input) 
             
             except ValidationExceptionError as ex:
                 errors[ex.base] = ex.key
             except ValueError: 
-                errors["base"] = "invalid_number_format"
+                errors["base"] = "invalid_number_format" 
             
             if not errors:
                 return self.async_create_entry(title="", data=input_data)

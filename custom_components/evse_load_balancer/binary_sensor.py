@@ -59,7 +59,6 @@ class EvseBinarySensor(BinarySensorEntity):
 BINARY_SENSOR_DESCRIPTIONS: tuple[BinarySensorEntityDescription, ...] = (
     BinarySensorEntityDescription(
         key="evse_ev_connected",
-        name="EV Connected",
         translation_key="evse_ev_connected",
         device_class=BinarySensorDeviceClass.PLUG,
         icon="mdi:power-plug-outline",
@@ -83,4 +82,3 @@ async def async_setup_entry(
     
     _LOGGER.debug(f"Setting up EVSE binary sensors: {entities_to_add}")
     async_add_entities(entities_to_add, update_before_add=False)
-    

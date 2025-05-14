@@ -53,8 +53,8 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
         # self.config_entry should be populated by HA before this method is called by a step
         options_values = self.config_entry.options
         
-        # Default to 32A if "fuse_size" is not found in config_entry.data
-        main_fuse_size_from_config_data = self.config_entry.data.get("fuse_size", 32) 
+        # Default to 16A if "fuse_size" is not found in config_entry.data
+        main_fuse_size_from_config_data = self.config_entry.data.get("fuse_size", 16) 
 
         return vol.Schema(
             {

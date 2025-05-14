@@ -41,6 +41,7 @@ balancer = OptimisedLoadBalancer(
 # Initially, the charger current per phase is the maximum.
 current_limits = dict.fromkeys(Phase, MAX_CHARGE_CURRENT_PER_PHASE)
 max_limits = dict.fromkeys(Phase, MAX_CHARGE_CURRENT_PER_PHASE)
+preferred_limits = current_limits.copy()
 
 # For ramp simulation we store both start and target limits per phase and a
 # common ramp counter.
@@ -85,21 +86,36 @@ for timestamp, row in df_final_selected.iterrows():
             )
         ramp_time_left -= 1
 
-    # Not ramping: compute new limits using our OptimisedLoadBalancer.
-    new_limits = balancer.compute_new_limits(
-        current_limits, available_currents, max_limits, now=now.timestamp()
-    )
-    # If any phase changed, trigger a ramp by storing current limits as start and
-    # new_limits as target.
+        # 1) get available‐current delta per phase (neg => must reduce, pos => can recover)
+        delta = balancer.compute_new_limits(
+            available_currents=available_currents,
+            max_limits=max_limits,
+            now=now.timestamp(),
+        )
+
+        # 2) translate delta → absolute desired limits, clamped by preferred_limits
+        desired_limits: dict[Phase, float] = {}
+        for phase in Phase:
+            if delta[phase] < 0:
+                # reduce immediately
+                desired_limits[phase] = current_limits[phase] + delta[phase]
+            else:
+                # recover up to the original preferred cap
+                desired_limits[phase] = min(
+                    preferred_limits[phase],
+                    current_limits[phase] + delta[phase],
+                )
+
+    # 3) If any phase changed, schedule a ramp from current → desired
     if ramp_time_left == 0 and any(
-        new_limits[ph] != current_limits[ph] for ph in Phase
+        desired_limits[ph] != current_limits[ph] for ph in Phase
     ):
         ramp_start = current_limits.copy()
-        ramp_target = new_limits.copy()
+        ramp_target = desired_limits.copy()
         ramp_time_left = RAMP_DURATION
         event = (
             "increase"
-            if any(new_limits[ph] > current_limits[ph] for ph in Phase)
+            if any(desired_limits[ph] > current_limits[ph] for ph in Phase)
             else "decrease"
         )
 

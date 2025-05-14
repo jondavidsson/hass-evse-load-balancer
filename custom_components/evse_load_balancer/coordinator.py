@@ -32,6 +32,7 @@ from .const import (
     EVSE_LOAD_BALANCER_COORDINATOR_EVENT,
 )
 from .meters.meter import Meter, Phase
+from .power_allocator import PowerAllocator
 
 if TYPE_CHECKING:
     from homeassistant.helpers.device_registry import DeviceEntry
@@ -68,8 +69,6 @@ class EVSELoadBalancerCoordinator:
         self._unsub: list[CALLBACK_TYPE] = []
         self._sensors: list[SensorEntity] = []
 
-        self._fuse_size = config_entry.data.get(cf.CONF_FUSE_SIZE, 0)
-
         self._meter: Meter = meter
         self._charger: Charger = charger
 
@@ -98,6 +97,12 @@ class EVSELoadBalancerCoordinator:
             * 60
         )
 
+        self._power_allocator = PowerAllocator(
+            chargers={
+                self._charger.id: self._charger
+            }
+        )
+
     async def async_unload(self) -> None:
         """Unload the coordinator."""
         for unsub in self._unsub:
@@ -121,7 +126,7 @@ class EVSELoadBalancerCoordinator:
         """Get the available current for a given phase."""
         active_current = self._meter.get_active_phase_current(phase)
         return (
-            min(self._fuse_size, floor(self.fuse_size - active_current))
+            min(self.fuse_size, floor(self.fuse_size - active_current))
             if active_current is not None
             else None
         )
@@ -168,7 +173,7 @@ class EVSELoadBalancerCoordinator:
         self._last_check_timestamp = datetime.now().astimezone()
         available_currents = self._get_available_currents()
         current_charger_setting = self._charger.get_current_limit()
-        max_charger_current = self._charger.get_max_current_limit()
+        max_current = dict.fromkeys(available_currents, self.fuse_size)
 
         if available_currents is None:
             _LOGGER.warning("Available current unknown. Cannot adjust limit.")
@@ -180,30 +185,30 @@ class EVSELoadBalancerCoordinator:
             )
             return
 
-        if max_charger_current is None:
-            _LOGGER.warning(
-                "Max charger current is not available. Cannot adjust limit."
-            )
-            return
-
         # making data available to sensors
         self._async_update_sensors()
 
         # Run the actual charger update
         if self._should_check_charger():
-            new_charger_settings = self._balancer_algo.compute_new_limits(
-                current_limits=current_charger_setting,
+            # Computes relative limit. Negative in case of overcurrent
+            # and positive in case of availability
+            normalised_current_availability = self._balancer_algo.compute_new_limits(
                 available_currents=available_currents,
-                max_limits=max_charger_current,
+                max_limits=max_current,
                 now=now.timestamp(),
             )
-            # Update the charger with the new settings
-            has_changed_values = any(
-                new_charger_settings[phase] is not current_charger_setting[phase]
-                for phase in new_charger_settings
+
+            allocation_results = self._power_allocator.update_allocation(
+                available_currents=normalised_current_availability,
+                now=now.timestamp(),
             )
-            if has_changed_values and self._may_update_charger_settings():
-                self._update_charger_settings(new_charger_settings)
+
+            # TODO: Allocaition results should be used to update the charger.
+            # Which in this case means the ID needs to be mapped, or a different
+            # approach needs to be taken to update them here.
+            #
+            # Idea is to update them in the coordinator to keep that logic out of the
+            # allocator.
 
     def _async_update_sensors(self) -> None:
         for sensor in self._sensors:
@@ -212,7 +217,7 @@ class EVSELoadBalancerCoordinator:
 
     def _should_check_charger(self) -> bool:
         """Check if the charger should be checked for current limit changes."""
-        return self._charger.can_charge()
+        return self._power_allocator.should_monitor()
 
     def _may_update_charger_settings(self) -> bool:
         """Check if the charger settings haven't been updated too recently."""

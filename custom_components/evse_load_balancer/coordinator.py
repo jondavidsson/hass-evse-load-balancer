@@ -98,9 +98,7 @@ class EVSELoadBalancerCoordinator:
         )
 
         self._power_allocator = PowerAllocator(
-            chargers={
-                self._charger.id: self._charger
-            }
+            chargers={self._charger.id: self._charger}
         )
 
     async def async_unload(self) -> None:
@@ -172,18 +170,12 @@ class EVSELoadBalancerCoordinator:
         """Execute the update cycle for the charger."""
         self._last_check_timestamp = datetime.now().astimezone()
         available_currents = self._get_available_currents()
-        current_charger_setting = self._charger.get_current_limit()
-        max_current = dict.fromkeys(available_currents, self.fuse_size)
 
         if available_currents is None:
             _LOGGER.warning("Available current unknown. Cannot adjust limit.")
             return
 
-        if current_charger_setting is None:
-            _LOGGER.warning(
-                "Current charger current limit is not available. Cannot adjust limit."
-            )
-            return
+        max_current = dict.fromkeys(available_currents, self.fuse_size)
 
         # making data available to sensors
         self._async_update_sensors()
@@ -192,7 +184,7 @@ class EVSELoadBalancerCoordinator:
         if self._should_check_charger():
             # Computes relative limit. Negative in case of overcurrent
             # and positive in case of availability
-            normalised_current_availability = self._balancer_algo.compute_new_limits(
+            normalised_current_availability = self._balancer_algo.compute_availability(
                 available_currents=available_currents,
                 max_limits=max_current,
                 now=now.timestamp(),
@@ -203,12 +195,19 @@ class EVSELoadBalancerCoordinator:
                 now=now.timestamp(),
             )
 
-            # TODO: Allocaition results should be used to update the charger.
-            # Which in this case means the ID needs to be mapped, or a different
-            # approach needs to be taken to update them here.
-            #
-            # Idea is to update them in the coordinator to keep that logic out of the
-            # allocator.
+            # Allocator has been build to support multiple chargers. Right now
+            # the coordinator only supports one charger. So we need to
+            # iterate over the allocation results and update the charger
+            # with the results. Just a bit of prep for the future...
+            allocation_result = allocation_results[self._charger.id]
+            if self._may_update_charger_settings():
+                self._update_charger_settings(allocation_result)
+            else:
+                _LOGGER.debug(
+                    "Charger settings not updated. Last update: %s, current time: %s",
+                    self._last_charger_target_update[1],
+                    int(time()),
+                )
 
     def _async_update_sensors(self) -> None:
         for sensor in self._sensors:

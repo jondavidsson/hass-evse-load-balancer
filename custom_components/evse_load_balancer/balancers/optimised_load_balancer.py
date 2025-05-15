@@ -47,27 +47,21 @@ class OptimisedLoadBalancer(Balancer):
         self.recovery_risk_threshold = recovery_risk_threshold
         self.recovery_std = recovery_std
 
-        self._control_limits: dict | None = None
+        self._last_computed_availability = {}
 
-    def compute_new_limits(
+    def compute_availability(
         self,
         available_currents: dict[Phase, int],
         max_limits: dict[Phase, int],
         now: float = time(),
     ) -> dict[Phase, int]:
-        """Compute new charger limits."""
+        """Compute available currents."""
         new_limits = {}
         elapsed = now - self._last_compute
 
-        # Seed control_limits to full max on 1st call
-        if not self._control_limits:
-            self._control_limits = {}
-            for phase in available_currents:
-                self._control_limits[phase] = max_limits[phase]
-
         for phase, avail in available_currents.items():
             max_limit = max_limits[phase]
-            new_target = avail
+            new_target = self._last_computed_availability.get(phase, avail)
 
             # 1) overcurrent - accumulate risk & handle reduction of current
             if avail < 0:
@@ -96,16 +90,15 @@ class OptimisedLoadBalancer(Balancer):
 
                 # If enough time has passed and the current setting is below maximum,
                 # consider increasing the power setting after stable recovery.
-                if (
-                    now - self._last_adjustment_time[phase] >= self.recovery_window
-                    and self.is_stable_recovery(self._recovery_risk_history[phase])
+                if now - self._last_adjustment_time[
+                    phase
+                ] >= self.recovery_window and self.is_stable_recovery(
+                    self._recovery_risk_history[phase]
                 ):
                     # Ensure stability via standard deviation.
                     std_val = pstdev(self._recovery_current_history[phase])
                     if std_val < self.recovery_std:
-                        new_target = median(
-                            self._recovery_current_history[phase]
-                        )
+                        new_target = median(self._recovery_current_history[phase])
                         self._last_adjustment_time[phase] = now
                         self._recovery_current_history[phase].clear()
                         self._recovery_risk_history[phase].clear()
@@ -114,6 +107,7 @@ class OptimisedLoadBalancer(Balancer):
             # New limit is max current scaled by the current power setting.
             new_limits[phase] = new_target
 
+        self._last_computed_availability = new_limits.copy()
         self._last_compute = now
         return new_limits
 

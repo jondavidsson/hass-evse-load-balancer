@@ -9,13 +9,18 @@ from custom_components.evse_load_balancer.const import Phase
 class MockCharger(Charger):
     """Mock implementation of a Charger for testing."""
 
-    def __init__(self, initial_current: int = 10, max_current: int = 16, synced_phases: bool = True):
+    def __init__(self,
+                 initial_current: int = 10,
+                 max_current: int = 16,
+                 synced_phases: bool = True,
+                 mock_id: str = "mock_id",
+                 mock_device_id: str = "mock_device_id") -> None:
         """Initialize MockCharger with configurable parameters."""
         # Skip the parent class initialization to avoid needing HomeAssistant, etc.
         # This is safe for testing but wouldn't work in production
         self.hass = None
-        self.config_entry = type('ConfigEntry', (), {'entry_id': 'mock_id'})()
-        self.device = type('DeviceEntry', (), {'id': 'mock_device_id'})()
+        self.config_entry = type('ConfigEntry', (), {'entry_id': mock_id})()
+        self.device = type('DeviceEntry', (), {'id': mock_device_id})()
 
         # Charger state
         self._current_limit = {phase: initial_current for phase in Phase}

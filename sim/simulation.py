@@ -86,8 +86,9 @@ for timestamp, row in df_final_selected.iterrows():
             )
         ramp_time_left -= 1
 
-        # 1) get available‐current delta per phase (neg => must reduce, pos => can recover)
-        delta = balancer.compute_new_limits(
+        # 1) get available current delta per phase
+        # (neg => must reduce, pos => can recover)
+        delta = balancer.compute_availability(
             available_currents=available_currents,
             max_limits=max_limits,
             now=now.timestamp(),

@@ -48,7 +48,7 @@ class ChargerState:
             self.manual_override_detected = True
             _LOGGER.info(
                 "Manual override detected for charger. New requested current: %s",
-                current_setting
+                current_setting,
             )
             return True
 
@@ -108,17 +108,18 @@ class PowerAllocator:
     def _active_chargers(self) -> dict[str, ChargerState]:
         """Return a dictionary of chargers that can take a charge."""
         return {
-            charger_id: state for charger_id, state
-            in self._chargers.items() if state.charger.can_charge()
+            charger_id: state
+            for charger_id, state in self._chargers.items()
+            if state.charger.can_charge()
         }
 
     def should_monitor(self) -> bool:
         """Check if any charger is connected and should be monitored."""
         return len(self._active_chargers) > 0
 
-    def update_allocation(self,
-                          available_currents: dict[Phase, int],
-                          now: float = time()) -> dict[str, dict[Phase, int]]:
+    def update_allocation(
+        self, available_currents: dict[Phase, int], now: float = time()
+    ) -> dict[str, dict[Phase, int]]:
         """
         Update power allocation for all chargers based on available current.
 
@@ -157,8 +158,7 @@ class PowerAllocator:
                 has_changes = min_new != min_current
             else:
                 has_changes = any(
-                    new_limits[phase] != current_setting[phase]
-                    for phase in new_limits
+                    new_limits[phase] != current_setting[phase] for phase in new_limits
                 )
 
             if has_changes:
@@ -169,9 +169,9 @@ class PowerAllocator:
 
         return result
 
-    def _allocate_current(self,
-                          available_currents: dict[Phase, int]
-                          ) -> dict[str, dict[Phase, int]]:
+    def _allocate_current(
+        self, available_currents: dict[Phase, int]
+    ) -> dict[str, dict[Phase, int]]:
         """
         Allocate current proportionally to requested currents.
 
@@ -191,10 +191,9 @@ class PowerAllocator:
 
         return result
 
-    def _distribute_cuts(self,
-                         phase: Phase,
-                         deficit: int,
-                         result: dict[str, dict[Phase, int]]) -> None:
+    def _distribute_cuts(
+        self, phase: Phase, deficit: int, result: dict[str, dict[Phase, int]]
+    ) -> None:
         """Distribute current cuts proportionally during overcurrent."""
         charger_currents = []
         total_current = 0
@@ -226,10 +225,9 @@ class PowerAllocator:
 
             result[charger_id][phase] = max(0, current_setting[phase] + int(cut))
 
-    def _distribute_increases(self,
-                              phase: Phase,
-                              surplus: int,
-                              result: dict[str, dict[Phase, int]]) -> None:
+    def _distribute_increases(
+        self, phase: Phase, surplus: int, result: dict[str, dict[Phase, int]]
+    ) -> None:
         """Distribute current increases proportionally during recovery."""
         potential_increases = []
         total_potential = 0

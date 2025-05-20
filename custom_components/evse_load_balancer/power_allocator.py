@@ -56,17 +56,19 @@ class ChargerState:
                 _LOGGER.info(
                     "New charging session detected for %s, resetting to maximum: %s",
                     self.charger.id,
-                    max_limits
+                    max_limits,
                 )
                 self._active_session = True
 
         # Check if current differs from what we last set
-        elif self.last_applied_current and \
-                current_setting and \
-                any(
-                    current_setting[phase] != self.last_applied_current[phase]
-                    for phase in current_setting
-                ):
+        elif (
+            self.last_applied_current
+            and current_setting
+            and any(
+                current_setting[phase] != self.last_applied_current[phase]
+                for phase in current_setting
+            )
+        ):
             self.requested_current = dict(current_setting)
             self.last_applied_current = dict(current_setting)
             self.manual_override_detected = True

@@ -26,8 +26,7 @@ class OptimisedLoadBalancer(Balancer):
         recovery_window: float = 900.0,  # seconds over which recovery is buffered.
         trip_risk_threshold: float = 60.0,  # risk value threshold to trigger reduction.
         risk_decay_per_second: float = 1.0,  # how quickly accumulated risk decays.
-        recovery_risk_threshold: float = 60
-        * 0.4,  # threshold for considering recovery stable.
+        recovery_risk_threshold: float = 60 * 0.4,  # threshold for stable  recovery.
         recovery_std: float = 2.5,  # maximum std dev allowed in recovery measurements.
     ) -> None:
         """Initialize the optimised load balancer."""

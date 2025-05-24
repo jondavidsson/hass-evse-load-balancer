@@ -58,27 +58,30 @@ class OptimisedLoadBalancer(Balancer):
         new_limits = {}
         elapsed = now - self._last_compute
 
+        # Track which phases are ready for potential recovery
+        phases_ready_for_recovery = set()
+
+        # First pass: Process all phases and identify which are ready
         for phase, avail in available_currents.items():
             max_limit = max_limits[phase]
             new_target = self._last_computed_availability.get(phase, avail)
 
-            # 1) overcurrent - accumulate risk & handle reduction of current
+            # 1) Overcurrent scenario - handle risk accumulation and reduction
             if avail < 0:
                 overcurrent_percentage = abs(avail) / max_limit
-                risk_increase = (
-                    self.calculate_trip_risk(overcurrent_percentage) * elapsed
-                )
+                risk_increase = self.calculate_trip_risk(overcurrent_percentage) * elapsed
                 self._cumulative_trip_risk[phase] += risk_increase
                 self._recovery_risk_history[phase].append(risk_increase)
 
-                # If risk exceeds threshold, immediately reduce power setting.
+                # If risk exceeds threshold, immediately reduce power setting
                 if self._cumulative_trip_risk[phase] >= self.trip_risk_threshold:
                     new_target = avail
                     self._last_adjustment_time[phase] = now
                     self._recovery_current_history[phase].clear()
                     self._recovery_risk_history[phase].clear()
                     self._cumulative_trip_risk[phase] = 0.0
-            # 2) availability - decay risk and handle recovery of current
+
+            # 2) No overcurrent - handle risk decay and prepare for recovery
             else:
                 risk_decay = self.risk_decay_per_second * elapsed
                 self._cumulative_trip_risk[phase] = max(
@@ -87,24 +90,29 @@ class OptimisedLoadBalancer(Balancer):
                 self._recovery_current_history[phase].append(avail)
                 self._recovery_risk_history[phase].append(-risk_decay)
 
-                # If enough time has passed and the current setting is below maximum,
-                # consider increasing the power setting after stable recovery.
-                if now - self._last_adjustment_time[
-                    phase
-                ] >= self.recovery_window and self.is_stable_recovery(
-                    self._recovery_risk_history[phase]
-                ):
-                    # Ensure stability via standard deviation.
-                    std_val = pstdev(self._recovery_current_history[phase])
-                    if std_val < self.recovery_std:
-                        new_target = median(self._recovery_current_history[phase])
-                        self._last_adjustment_time[phase] = now
-                        self._recovery_current_history[phase].clear()
-                        self._recovery_risk_history[phase].clear()
-                        self._cumulative_trip_risk[phase] = 0.0
+                # Check if this phase meets recovery criteria
+                recovery_time_elapsed = now - self._last_adjustment_time[phase] >= self.recovery_window
+                is_stable = self.is_stable_recovery(self._recovery_risk_history[phase])
+                std_val = pstdev(self._recovery_current_history[phase]) if self._recovery_current_history[phase] else float("inf")
+                is_consistent = std_val < self.recovery_std
 
-            # New limit is max current scaled by the current power setting.
+                if recovery_time_elapsed and is_stable and is_consistent:
+                    phases_ready_for_recovery.add(phase)
+
             new_limits[phase] = new_target
+
+        # Second pass: If any phase is ready for recovery, coordinate updates
+        if phases_ready_for_recovery:
+            # Check if other phases are close to ready (e.g., at least 80% of window elapsed)
+            near_ready_threshold = self.recovery_window * 0.8
+            for phase in available_currents:
+                if now - self._last_adjustment_time[phase] >= near_ready_threshold:
+                    # Use a more conservative value for phases that aren't fully ready
+                    safe_value = median(self._recovery_current_history[phase])
+                    new_limits[phase] = safe_value
+                    self._last_adjustment_time[phase] = now
+                    self._recovery_current_history[phase].clear()
+                    self._recovery_risk_history[phase].clear()
 
         self._last_computed_availability = new_limits.copy()
         self._last_compute = now

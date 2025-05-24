@@ -108,7 +108,7 @@ for timestamp, row in df.iterrows():
 
         # Apply new limits if needed
         if allocation_result:
-            _LOGGER.info("Setting new current limit for charger %s: %s", charger.id, allocation_result)
+            _LOGGER.info("[%s] Setting new current limit for charger %s: %s", now.timestamp(), charger.id, allocation_result)
             charger.set_current_limit(allocation_result)
             allocator.update_applied_current(
                 charger_id=charger.id,

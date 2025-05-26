@@ -19,6 +19,7 @@ from custom_components.evse_load_balancer.coordinator import (
     MIN_CHARGER_UPDATE_DELAY,
 )
 from .helpers.mock_charger import MockCharger
+from custom_components.evse_load_balancer import options_flow as of
 
 TEST_CHARGER_ID = "test_charger_id_1"
 
@@ -157,7 +158,6 @@ def test_charger_allocation(coordinator):
     coordinator._balancer_algo.compute_availability.assert_called_once()
     args = coordinator._balancer_algo.compute_availability.call_args[1]
     assert "available_currents" in args
-    assert "max_limits" in args
     assert "now" in args
 
     # Verify power allocator was called with balancer results
@@ -260,10 +260,13 @@ def test_no_update_too_frequent(coordinator):
 
 def test_update_after_delay(coordinator):
     """Test that update happens after sufficient delay."""
+    min_charge_minutes = of.EvseLoadBalancerOptionsFlow.get_option_value(
+        coordinator.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
+    )
     # Set update time far enough in the past
     coordinator._last_charger_target_update = (
         {Phase.L1: 10, Phase.L2: 10, Phase.L3: 10},
-        int(datetime.now().timestamp()) - (MIN_CHARGER_UPDATE_DELAY + 10),
+        int(datetime.now().timestamp()) - (MIN_CHARGER_UPDATE_DELAY + 10 + (min_charge_minutes * 60)),
     )
 
     # Execute update cycle

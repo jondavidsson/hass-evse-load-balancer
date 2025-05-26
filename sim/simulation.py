@@ -59,17 +59,20 @@ df = pd.read_csv(
     parse_dates=True,
 )
 
-# Setup simulation objects
-balancer = OptimisedLoadBalancer()
-allocator = PowerAllocator()
-charger = FakeCharger()
-allocator.add_charger(charger)
-
 # Initial state
 current_limits = dict.fromkeys(Phase, MAX_CHARGE_CURRENT_PER_PHASE)
 max_limits = dict.fromkeys(Phase, FUSE_SIZE)
 prev_timestamp = None
 
+# Setup simulation objects
+balancer = OptimisedLoadBalancer(
+    max_limits=max_limits,
+)
+allocator = PowerAllocator()
+charger = FakeCharger()
+allocator.add_charger(charger)
+
+# Graph vars
 log_time = []
 log_charger_limits = []
 log_computed_current = {phase: [] for phase in Phase}
@@ -77,6 +80,7 @@ log_available_current = {phase: [] for phase in Phase}
 stat_kwh_charged = 0.0
 
 _previous_computed_current = None
+_previous_applied_current_timestamp = 0
 
 for timestamp, row in df.iterrows():
     now = timestamp
@@ -95,7 +99,6 @@ for timestamp, row in df.iterrows():
     # Balancer computes phase deltas
     computed_availability = balancer.compute_availability(
         available_currents=available_currents,
-        max_limits=max_limits,
         now=now.timestamp(),
     )
 
@@ -107,7 +110,9 @@ for timestamp, row in df.iterrows():
         allocation_result = allocation_results.get(charger.id, None)
 
         # Apply new limits if needed
-        if allocation_result:
+        if allocation_result and \
+                (now.timestamp() - _previous_applied_current_timestamp > 900 or
+                 any(charger.get_current_limit()[phase] > allocation_result[phase] for phase in allocation_result.keys())):
             _LOGGER.info("[%s] Setting new current limit for charger %s: %s", now.timestamp(), charger.id, allocation_result)
             charger.set_current_limit(allocation_result)
             allocator.update_applied_current(
@@ -115,6 +120,7 @@ for timestamp, row in df.iterrows():
                 applied_current=allocation_result,
                 timestamp=now.timestamp(),
             )
+            _previous_applied_current_timestamp = now.timestamp()
 
     # Logging for analysis
     log_time.append(now)
@@ -147,13 +153,13 @@ df_log = pd.DataFrame(
 ).set_index("timestamp")
 
 fig, ax1 = plt.subplots(figsize=(18, 5))
-ax1.plot(df_log.index, df_log[Phase.L1], label="Available L1 (A)", color="green", linewidth=1, alpha=0.7)
-ax1.plot(df_log.index, df_log[Phase.L2], label="Available L2 (A)", color="orange", linewidth=1, alpha=0.7)
-ax1.plot(df_log.index, df_log[Phase.L3], label="Available L3 (A)", color="purple", linewidth=1, alpha=0.7)
-ax1.plot(df_log.index, df_log["Computed L1"], label="Computed L1 (A)", color="green", linewidth=1, alpha=0.5, linestyle="--")
-ax1.plot(df_log.index, df_log["Computed L2"], label="Computed L2 (A)", color="orange", linewidth=1, alpha=0.5, linestyle="--")
-ax1.plot(df_log.index, df_log["Computed L3"], label="Computed L3 (A)", color="purple", linewidth=1, alpha=0.5, linestyle="--")
-ax1.plot(df_log.index, df_log["charger_limit"], label="Charger Limit (A)", color="blue", linewidth=2, alpha=0.7)
+ax1.plot(df_log.index, df_log[Phase.L1], label="Available L1 (A)", color="green", linewidth=1, alpha=0.5, linestyle="--")
+ax1.plot(df_log.index, df_log[Phase.L2], label="Available L2 (A)", color="orange", linewidth=1, alpha=0.5, linestyle="--")
+ax1.plot(df_log.index, df_log[Phase.L3], label="Available L3 (A)", color="purple", linewidth=1, alpha=0.5, linestyle="--")
+ax1.plot(df_log.index, df_log["Computed L1"], label="Computed L1 (A)", color="green", linewidth=1, alpha=0.75)
+ax1.plot(df_log.index, df_log["Computed L2"], label="Computed L2 (A)", color="orange", linewidth=1, alpha=0.75)
+ax1.plot(df_log.index, df_log["Computed L3"], label="Computed L3 (A)", color="purple", linewidth=1, alpha=0.75)
+ax1.plot(df_log.index, df_log["charger_limit"], label="Charger Limit (A)", color="blue", linewidth=2, alpha=0.3)
 ax1.set_ylabel("Charger Limit (A)")
 ax1.set_xlabel("Time")
 ax1.grid(visible=True)

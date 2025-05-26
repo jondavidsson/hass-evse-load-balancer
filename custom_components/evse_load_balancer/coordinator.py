@@ -18,9 +18,7 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from . import config_flow as cf
 from . import options_flow as of
-from .balancers.optimised_load_balancer import (
-    OptimisedLoadBalancer,
-)
+from .balancers.optimised_load_balancer import OptimisedLoadBalancer
 from .chargers.charger import Charger
 from .const import (
     COORDINATOR_STATE_AWAITING_CHARGER,
@@ -92,11 +90,9 @@ class EVSELoadBalancerCoordinator:
             self.config_entry.add_update_listener(self._handle_options_update)
         )
 
+        max_limits = dict.fromkeys(self._available_phases, self.fuse_size)
         self._balancer_algo = OptimisedLoadBalancer(
-            recovery_window=of.EvseLoadBalancerOptionsFlow.get_option_value(
-                self.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
-            )
-            * 60
+            max_limits=max_limits,
         )
 
         self._power_allocator = PowerAllocator()
@@ -176,8 +172,6 @@ class EVSELoadBalancerCoordinator:
             _LOGGER.warning("Available current unknown. Cannot adjust limit.")
             return
 
-        max_current = dict.fromkeys(available_currents, self.fuse_size)
-
         # making data available to sensors
         self._async_update_sensors()
 
@@ -189,7 +183,6 @@ class EVSELoadBalancerCoordinator:
         # and positive in case of availability
         computed_availability = self._balancer_algo.compute_availability(
             available_currents=available_currents,
-            max_limits=max_current,
             now=now.timestamp(),
         )
 
@@ -205,7 +198,7 @@ class EVSELoadBalancerCoordinator:
         # iterate over the allocation results and update the charger
         # with the results. Just a bit of prep for the future...
         allocation_result = allocation_results.get(self._charger.id, None)
-        if allocation_result and self._may_update_charger_settings():
+        if allocation_result and self._may_update_charger_settings(allocation_result):
             self._update_charger_settings(allocation_result)
             self._power_allocator.update_applied_current(
                 charger_id=self._charger.id,
@@ -235,20 +228,38 @@ class EVSELoadBalancerCoordinator:
         """Check if the charger should be checked for current limit changes."""
         return self._power_allocator.should_monitor()
 
-    def _may_update_charger_settings(self) -> bool:
+    def _may_update_charger_settings(self, new_settings: dict[Phase, int]) -> bool:
         """Check if the charger settings haven't been updated too recently."""
         if self._last_charger_target_update is None:
             return True
 
-        last_update_time = self._last_charger_target_update[1]
-        if int(time()) - last_update_time > MIN_CHARGER_UPDATE_DELAY:
-            return True
+        last_charger_target, last_update_time = self._last_charger_target_update
+        now = int(time())
+
+        of_charger_delay_minutes = of.EvseLoadBalancerOptionsFlow.get_option_value(
+            self.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
+        )
+
+        if now - last_update_time > MIN_CHARGER_UPDATE_DELAY:
+            if any(new_settings[p] < last_charger_target[p] for p in new_settings):
+                _LOGGER.debug(
+                    "New charger settings are lower, apply ignoring user setting. "
+                    "Last settings: %s, new settings: %s",
+                    last_charger_target,
+                    new_settings,
+                )
+                return True
+
+            if now - last_update_time > (of_charger_delay_minutes * 60):
+                return True
 
         _LOGGER.debug(
             "Charger settings was updated too recently. "
-            "Last update: %s, current time: %s",
+            "Last update: %s, current time: %s"
+            "Configured delay: %s minutes",
             last_update_time,
             int(time()),
+            of_charger_delay_minutes,
         )
         return False
 

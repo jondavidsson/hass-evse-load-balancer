@@ -142,6 +142,7 @@ class EaseeCharger(HaDevice, Charger):
 
     def can_charge(self) -> bool:
         """See abstract Charger class for correct implementation of this method."""
+        return True
         status = self._get_status()
         return status in [
             EaseeStatusMap.AwaitingStart,

@@ -1,7 +1,5 @@
 """Abstract Balancer Base Class for Load Balancing Algorithms."""
 
-from collections import deque
-from statistics import median, pstdev
 from time import time
 
 from ..meters.meter import Phase  # noqa: TID252
@@ -23,102 +21,84 @@ class OptimisedLoadBalancer(Balancer):
 
     def __init__(
         self,
-        recovery_window: float = 900.0,  # seconds over which recovery is buffered.
-        trip_risk_threshold: float = 60.0,  # risk value threshold to trigger reduction.
-        risk_decay_per_second: float = 1.0,  # how quickly accumulated risk decays.
-        recovery_risk_threshold: float = 60 * 0.4,  # threshold for stable  recovery.
-        recovery_std: float = 2.5,  # maximum std dev allowed in recovery measurements.
+        max_limits: dict[Phase, int],
+        hold_off_period: int = 30,  # Period between updates before returning a new value
+        trip_risk_threshold: int = 60,  # Allowed risk before reducing the limit
+        risk_decay_per_second: float = 1.0,  # How quickly accumulated risk decays
     ) -> None:
-        """Initialize the optimised load balancer."""
-        self._recovery_current_history = {
-            phase: deque(maxlen=int(recovery_window)) for phase in Phase
-        }
-        self._recovery_risk_history = {
-            phase: deque(maxlen=int(recovery_window)) for phase in Phase
-        }
-        self._cumulative_trip_risk = dict.fromkeys(Phase, 0.0)
-        self._last_adjustment_time = dict.fromkeys(Phase, 0)
-        self._last_compute = 0
-
-        self.recovery_window = recovery_window
-        self.trip_risk_threshold = trip_risk_threshold
-        self.risk_decay_per_second = risk_decay_per_second
-        self.recovery_risk_threshold = recovery_risk_threshold
-        self.recovery_std = recovery_std
-
-        self._last_computed_availability = {}
+        """Initialize the load balancer."""
+        self._phase_monitors = {phase: PhaseMonitor(
+            phase=phase,
+            max_limit=max_limits[phase],
+            hold_off_period=hold_off_period,
+            trip_risk_threshold=trip_risk_threshold,
+            risk_decay_per_second=risk_decay_per_second,
+        ) for phase in max_limits}
 
     def compute_availability(
         self,
         available_currents: dict[Phase, int],
-        max_limits: dict[Phase, int],
         now: float = time(),
     ) -> dict[Phase, int]:
         """Compute available currents."""
-        new_limits = {}
-        elapsed = now - self._last_compute
+        available = {}
+        for phase, current in available_currents.items():
+            available[phase] = self._phase_monitors[phase].update(
+                avail=current, now=now
+            )
+        return available
 
-        # Track which phases are ready for potential recovery
-        phases_ready_for_recovery = set()
 
-        # First pass: Process all phases and identify which are ready
-        for phase, avail in available_currents.items():
-            max_limit = max_limits[phase]
-            new_target = self._last_computed_availability.get(phase, avail)
+class PhaseMonitor:
+    """Monitor a single phase."""
 
-            # 1) Overcurrent scenario - handle risk accumulation and reduction
-            if avail < 0:
-                overcurrent_percentage = abs(avail) / max_limit
-                risk_increase = self.calculate_trip_risk(overcurrent_percentage) * elapsed
-                self._cumulative_trip_risk[phase] += risk_increase
-                self._recovery_risk_history[phase].append(risk_increase)
+    def __init__(self,
+                 phase: Phase,
+                 max_limit: int,
+                 hold_off_period: int = 30,
+                 trip_risk_threshold: int = 60,
+                 risk_decay_per_second: float = 1.0) -> None:
+        """Monitor given phase current availability and return normalised limits."""
+        self.phase = phase
+        self.max_limit = max_limit
+        self.phase_limit = max_limit  # Initial limit is the maximum limit
+        self._hold_off_period = hold_off_period
+        self._trip_risk_threshold = trip_risk_threshold
+        self._risk_decay_per_second = risk_decay_per_second
 
-                # If risk exceeds threshold, immediately reduce power setting
-                if self._cumulative_trip_risk[phase] >= self.trip_risk_threshold:
-                    new_target = avail
-                    self._last_adjustment_time[phase] = now
-                    self._recovery_current_history[phase].clear()
-                    self._recovery_risk_history[phase].clear()
-                    self._cumulative_trip_risk[phase] = 0.0
+        self.next_probe_time = 0
+        self._last_compute: int | None = None
+        self._cumulative_trip_risk = 0.0
 
-            # 2) No overcurrent - handle risk decay and prepare for recovery
-            else:
-                risk_decay = self.risk_decay_per_second * elapsed
-                self._cumulative_trip_risk[phase] = max(
-                    0.0, self._cumulative_trip_risk[phase] - risk_decay
-                )
-                self._recovery_current_history[phase].append(avail)
-                self._recovery_risk_history[phase].append(-risk_decay)
+    def update(self, avail: float, now: int) -> float:
+        """Update the current availability and compute the new limit."""
+        elapsed = now - self._last_compute if self._last_compute is not None else 0
 
-                # Check if this phase meets recovery criteria
-                recovery_time_elapsed = now - self._last_adjustment_time[phase] >= self.recovery_window
-                is_stable = self.is_stable_recovery(self._recovery_risk_history[phase])
-                std_val = pstdev(self._recovery_current_history[phase]) if self._recovery_current_history[phase] else float("inf")
-                is_consistent = std_val < self.recovery_std
+        # Multiplicative decrease on overcurrent
+        if avail < 0:
+            risk_increase = self._calculate_trip_risk(avail) * elapsed
+            self._cumulative_trip_risk += risk_increase
 
-                if recovery_time_elapsed and is_stable and is_consistent:
-                    phases_ready_for_recovery.add(phase)
+            # If risk exceeds threshold, multiplicative reduction of power
+            if self._cumulative_trip_risk >= self._trip_risk_threshold:
+                self._cumulative_trip_risk = 0.0
+                self.phase_limit = avail
+                self.next_probe_time = now + self._hold_off_period
+        # Additive increase when line is stable and hold_off_period elapsed
+        else:
+            risk_decay = self._risk_decay_per_second * elapsed
+            self._cumulative_trip_risk = max(
+                0.0, self._cumulative_trip_risk - risk_decay
+            )
+            if now >= self.next_probe_time:
+                self.phase_limit = min(self.max_limit, avail)
+                self.next_probe_time = now + self._hold_off_period
 
-            new_limits[phase] = new_target
-
-        # Second pass: If any phase is ready for recovery, coordinate updates
-        if phases_ready_for_recovery:
-            # Check if other phases are close to ready (e.g., at least 80% of window elapsed)
-            near_ready_threshold = self.recovery_window * 0.8
-            for phase in available_currents:
-                if now - self._last_adjustment_time[phase] >= near_ready_threshold:
-                    # Use a more conservative value for phases that aren't fully ready
-                    safe_value = median(self._recovery_current_history[phase])
-                    new_limits[phase] = safe_value
-                    self._last_adjustment_time[phase] = now
-                    self._recovery_current_history[phase].clear()
-                    self._recovery_risk_history[phase].clear()
-
-        self._last_computed_availability = new_limits.copy()
         self._last_compute = now
-        return new_limits
 
-    def calculate_trip_risk(self, overcurrent_percentage: float) -> float:
+        return self.phase_limit
+
+    def _calculate_trip_risk(self, available: float) -> float:
         """
         Calculate trip risk factor based on overcurrent percentage.
 
@@ -128,14 +108,11 @@ class OptimisedLoadBalancer(Balancer):
         the values here are roughly (as in extremely roughly) based on
         the trip risk curve in C-character circuit breakers.
         """
+        overcurrent_percentage = abs(available) / self.max_limit
         if overcurrent_percentage <= 0.13:  # noqa: PLR2004
-            return self.trip_risk_threshold / 60
+            return self._trip_risk_threshold / 60
         if overcurrent_percentage <= 0.40:  # noqa: PLR2004
-            return self.trip_risk_threshold / 30
+            return self._trip_risk_threshold / 30
         if overcurrent_percentage <= 1.0:
-            return self.trip_risk_threshold / 10
-        return self.trip_risk_threshold
-
-    def is_stable_recovery(self, history: deque) -> bool:
-        """Is recovery stable based on the history of available currents."""
-        return sum(history) <= self.recovery_risk_threshold if history else False
+            return self._trip_risk_threshold / 10
+        return self._trip_risk_threshold

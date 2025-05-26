@@ -8,7 +8,6 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow
 from homeassistant.helpers.selector import NumberSelector
 
-from .config_flow import CONF_FUSE_SIZE
 from .exceptions.validation_exception import ValidationExceptionError
 
 if TYPE_CHECKING:
@@ -52,10 +51,6 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
         """Define the schema for the options flow."""
         options_values = self.config_entry.options
 
-        main_fuse_size_from_config_data = self.config_entry.data.get(
-            CONF_FUSE_SIZE, None
-        )
-
         return vol.Schema(
             {
                 vol.Required(
@@ -81,7 +76,7 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                 ): NumberSelector(
                     {
                         "min": 0,
-                        "max": main_fuse_size_from_config_data,
+                        "max": 100,
                         "step": 1,
                         "mode": "box",
                         "unit_of_measurement": "A",

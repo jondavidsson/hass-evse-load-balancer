@@ -24,15 +24,13 @@ from homeassistant.helpers.selector import (
 from packaging.version import parse as parse_version
 
 from .const import (
-    DOMAIN,
-    SUPPORTED_CHARGER_DEVICE_DOMAINS,
-    SUPPORTED_METER_DEVICE_DOMAINS,
     CHARGER_DOMAIN_EASEE,
     CHARGER_DOMAIN_ZAPTEC,
+    CHARGER_MANUFACTURER_AMINA,
+    DOMAIN,
     HA_INTEGRATION_DOMAIN_MQTT,
-    MANUFACTURER_AMINA,
-    MODEL_AMINA_S_OFFICIAL_NAME,
-    MODEL_AMINA_S_Z2M_INTERNAL,
+    SUPPORTED_CHARGER_DEVICE_DOMAINS,
+    SUPPORTED_METER_DEVICE_DOMAINS,
 )
 from .exceptions.validation_exception import ValidationExceptionError
 from .options_flow import EvseLoadBalancerOptionsFlow
@@ -51,7 +49,6 @@ CONF_CUSTOM_PHASE_CONFIG = "custom_phase_config"
 CONF_METER_DEVICE = "meter_device"
 CONF_CHARGER_DEVICE = "charger_device"
 
-# --- Construct the specific filter list for charger devices ---
 _charger_device_filter_list: list[dict[str, str]] = []
 
 if CHARGER_DOMAIN_EASEE in SUPPORTED_CHARGER_DEVICE_DOMAINS:
@@ -64,27 +61,16 @@ if HA_INTEGRATION_DOMAIN_MQTT in SUPPORTED_CHARGER_DEVICE_DOMAINS:
     _charger_device_filter_list.append(
         {
             "integration": HA_INTEGRATION_DOMAIN_MQTT,
-            "manufacturer": MANUFACTURER_AMINA,
-            "model": MODEL_AMINA_S_OFFICIAL_NAME
+            "manufacturer": CHARGER_MANUFACTURER_AMINA,
         }
     )
-    # Add a second filter if the internal Z2M model name is different and might be used
-    if MODEL_AMINA_S_OFFICIAL_NAME != MODEL_AMINA_S_Z2M_INTERNAL:
-        _charger_device_filter_list.append(
-            {
-                "integration": HA_INTEGRATION_DOMAIN_MQTT,
-                "manufacturer": MANUFACTURER_AMINA,
-                "model": MODEL_AMINA_S_Z2M_INTERNAL
-            }
-        )
-# --- End of filter list construction ---
 
 STEP_INIT_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CHARGER_DEVICE): DeviceSelector(
             DeviceSelectorConfig(
                 multiple=False,
-                filter=_charger_device_filter_list, # MODIFIED: Use the new specific filter list
+                filter=_charger_device_filter_list,
             )
         ),
         vol.Required(CONF_FUSE_SIZE): NumberSelector(
@@ -176,7 +162,7 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 1
 
-    data = {}  # noqa: RUF012
+    cf_data = {}  # noqa: RUF012
 
     @staticmethod
     @callback
@@ -201,12 +187,12 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
             except ValidationExceptionError as ex:
                 errors[ex.base] = ex.key
             if not errors:
-                self.data.update(input_data) # Changed to update for multi-step data accumulation
-                if self.data.get(CONF_CUSTOM_PHASE_CONFIG, False):
+                self.cf_data.update(input_data)
+                if self.cf_data.get(CONF_CUSTOM_PHASE_CONFIG, False):
                     return await self.async_step_power()
                 return self.async_create_entry(
                     title="EVSE Load Balancer",
-                    data=self.data,
+                    data=self.cf_data,
                 )
 
         return self.async_show_form(
@@ -225,16 +211,16 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             if not errors:
-                self.data.update(input_data) # Merge with existing data
+                self.cf_data.update(input_data)  # Merge with existing data
                 return self.async_create_entry(
                     title="EVSE Load Balancer",
-                    data=self.data,
+                    data=self.cf_data,
                 )
 
         return self.async_show_form(
             step_id="power",
             data_schema=create_phase_power_data_schema(
-                phase_count=self.data.get(CONF_PHASE_COUNT, 1)
+                phase_count=self.cf_data.get(CONF_PHASE_COUNT, 1)
             ),
             errors=errors,
         )

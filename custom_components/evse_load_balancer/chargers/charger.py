@@ -31,6 +31,15 @@ class Charger(ABC):
         self.config_entry = config_entry
         self.device = device
 
+    @staticmethod
+    @abstractmethod
+    def is_charger_device(device: DeviceEntry) -> bool:
+        """Check if given device is of class' type charger."""
+
+    @abstractmethod
+    def async_setup(self) -> None:
+        """Set up charger."""
+
     @abstractmethod
     def set_phase_mode(self, mode: PhaseMode, phase: Phase) -> None:
         """Set the phase mode of the charger."""
@@ -66,3 +75,7 @@ class Charger(ABC):
     @abstractmethod
     def can_charge(self) -> bool:
         """Return whether the car is connected and charging or accepting charge."""
+
+    @abstractmethod
+    async def async_unload(self) -> None:
+        """Unload the charger instance."""

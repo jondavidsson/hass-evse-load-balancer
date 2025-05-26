@@ -51,6 +51,16 @@ class ZaptecCharger(HaDevice, Charger):
         Charger.__init__(self, hass, config_entry, device_entry)
         self.refresh_entities()
 
+    @staticmethod
+    def is_charger_device(device: DeviceEntry) -> bool:
+        """Check if the given device is an Easee charger."""
+        return any(
+            id_domain == CHARGER_DOMAIN_ZAPTEC for id_domain, _ in device.identifiers
+        )
+
+    def async_setup(self) -> None:
+        """Set up the charger."""
+
     def set_phase_mode(self, mode: PhaseMode, _phase: Phase) -> None:
         """Set the phase mode of the charger."""
         if mode not in PhaseMode:
@@ -146,3 +156,7 @@ class ZaptecCharger(HaDevice, Charger):
             ZaptecStatusMap.ConnectedCharging,
             ZaptecStatusMap.ConnectedFinished,
         )
+
+    async def async_unload(self) -> None:
+        """Unload the Easee charger."""
+        # No specific unload logic

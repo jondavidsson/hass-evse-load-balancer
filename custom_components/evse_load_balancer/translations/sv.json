@@ -50,15 +50,6 @@
         }
     },
     "entity": {
-        "binary_sensor": {
-            "evse_ev_connected": {
-                "name": "Elbil ansluten",
-                "state": {
-                    "on": "Ansluten",
-                    "off": "Frånkopplad"
-                }
-            }
-        },
         "sensor": {
             "evse_load_balancing_state": {
                 "name": "Lastbalanseringsläge",

@@ -12,7 +12,6 @@ from homeassistant.components.sensor import (
 from .const import (
     COORDINATOR_STATES,
     DOMAIN,
-    POSSIBLE_CHARGER_EV_STATUSES,
 )
 from .coordinator import EVSELoadBalancerCoordinator
 from .load_balancer_phase_sensor import (
@@ -87,17 +86,6 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
             translation_key="evse_available_current_l3",
             device_class=SensorDeviceClass.CURRENT,
             suggested_display_precision=0,
-            entity_registry_enabled_default=False,
-        ),
-    ),
-    (
-        LoadBalancerSensor,
-        SensorEntityDescription(
-            key="evse_ev_status",
-            translation_key="evse_ev_status",
-            device_class=SensorDeviceClass.ENUM,
-            options=POSSIBLE_CHARGER_EV_STATUSES,
-            icon="mdi:ev-station",
             entity_registry_enabled_default=False,
         ),
     ),

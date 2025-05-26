@@ -50,15 +50,6 @@
         }
     },
     "entity": {
-        "binary_sensor": {
-            "evse_ev_connected": {
-                    "name": "EV connected",
-                    "state": {
-                        "on": "Connected",
-                        "off": "Disconnected"
-                }
-            }
-        },
         "sensor": {
             "evse_load_balancing_state": {
                 "name": "Load balancing state",

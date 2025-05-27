@@ -76,7 +76,6 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                 ): NumberSelector(
                     {
                         "min": 0,
-                        "max": 100,
                         "step": 1,
                         "mode": "box",
                         "unit_of_measurement": "A",

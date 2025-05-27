@@ -53,12 +53,12 @@ class ZaptecCharger(HaDevice, Charger):
 
     @staticmethod
     def is_charger_device(device: DeviceEntry) -> bool:
-        """Check if the given device is an Easee charger."""
+        """Check if the given device is a Zaptec charger."""
         return any(
             id_domain == CHARGER_DOMAIN_ZAPTEC for id_domain, _ in device.identifiers
         )
 
-    def async_setup(self) -> None:
+    async def async_setup(self) -> None:
         """Set up the charger."""
 
     def set_phase_mode(self, mode: PhaseMode, _phase: Phase | None = None) -> None:
@@ -67,8 +67,7 @@ class ZaptecCharger(HaDevice, Charger):
             msg = "Invalid mode. Must be 'single' or 'multi'."
             raise ValueError(msg)
 
-        # TODO(Dirk): Implement the logic to set the phase mode for Easee # noqa: FIX002
-        # chargers.
+        # TODO(Dirk): Implement the logic to set the phase mode # noqa: FIX002
         # https://github.com/dirkgroenen/hass-evse-load-balancer/issues/9
 
     async def set_current_limit(self, limit: dict[Phase, int]) -> None:

@@ -59,21 +59,6 @@
                     "error": "Fel"
                 }
             },
-            "evse_ev_status": {
-                "name": "Fordonsstatus",
-                "state": {
-                    "Not Connected": "Inte ansluten",
-                    "EV Connected": "Elbil ansluten",
-                    "Ready to charge": "Redo att ladda",
-                    "Charging": "Laddar",
-                    "Charging Paused": "Laddning pausad",
-                    "EV Connected, Derated": "Elbil ansluten, reducerad effekt",
-                    "Ready to charge, Derated": "Redo att ladda, reducerad effekt",
-                    "Charging, Derated": "Laddar, reducerad effekt",
-                    "Charging Paused, Derated": "Laddning pausad, reducerad effekt",
-                    "unknown": "Okänd"
-                }
-            },
             "evse_last_check": {
                 "name": "Senast kontrollerad"
             },

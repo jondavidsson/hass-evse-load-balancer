@@ -22,18 +22,21 @@ class OptimisedLoadBalancer(Balancer):
     def __init__(
         self,
         max_limits: dict[Phase, int],
-        hold_off_period: int = 30,  # Period between updates before returning a new value
+        hold_off_period: int = 30,  # Period between updates before returning new value
         trip_risk_threshold: int = 60,  # Allowed risk before reducing the limit
         risk_decay_per_second: float = 1.0,  # How quickly accumulated risk decays
     ) -> None:
         """Initialize the load balancer."""
-        self._phase_monitors = {phase: PhaseMonitor(
-            phase=phase,
-            max_limit=max_limits[phase],
-            hold_off_period=hold_off_period,
-            trip_risk_threshold=trip_risk_threshold,
-            risk_decay_per_second=risk_decay_per_second,
-        ) for phase in max_limits}
+        self._phase_monitors = {
+            phase: PhaseMonitor(
+                phase=phase,
+                max_limit=max_limits[phase],
+                hold_off_period=hold_off_period,
+                trip_risk_threshold=trip_risk_threshold,
+                risk_decay_per_second=risk_decay_per_second,
+            )
+            for phase in max_limits
+        }
 
     def compute_availability(
         self,
@@ -52,12 +55,14 @@ class OptimisedLoadBalancer(Balancer):
 class PhaseMonitor:
     """Monitor a single phase."""
 
-    def __init__(self,
-                 phase: Phase,
-                 max_limit: int,
-                 hold_off_period: int = 30,
-                 trip_risk_threshold: int = 60,
-                 risk_decay_per_second: float = 1.0) -> None:
+    def __init__(
+        self,
+        phase: Phase,
+        max_limit: int,
+        hold_off_period: int = 30,
+        trip_risk_threshold: int = 60,
+        risk_decay_per_second: float = 1.0,
+    ) -> None:
         """Monitor given phase current availability and return normalised limits."""
         self.phase = phase
         self.max_limit = max_limit

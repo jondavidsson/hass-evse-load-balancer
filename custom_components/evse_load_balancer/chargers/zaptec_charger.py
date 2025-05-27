@@ -61,7 +61,7 @@ class ZaptecCharger(HaDevice, Charger):
     def async_setup(self) -> None:
         """Set up the charger."""
 
-    def set_phase_mode(self, mode: PhaseMode, _phase: Phase) -> None:
+    def set_phase_mode(self, mode: PhaseMode, _phase: Phase | None = None) -> None:
         """Set the phase mode of the charger."""
         if mode not in PhaseMode:
             msg = "Invalid mode. Must be 'single' or 'multi'."

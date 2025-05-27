@@ -162,7 +162,7 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 1
 
-    cf_data = {}  # noqa: RUF012
+    cf_data: dict | None = None
 
     @staticmethod
     @callback
@@ -187,7 +187,7 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
             except ValidationExceptionError as ex:
                 errors[ex.base] = ex.key
             if not errors:
-                self.cf_data.update(input_data)
+                self.cf_data = input_data
                 if self.cf_data.get(CONF_CUSTOM_PHASE_CONFIG, False):
                     return await self.async_step_power()
                 return self.async_create_entry(
@@ -211,7 +211,7 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             if not errors:
-                self.cf_data.update(input_data)  # Merge with existing data
+                self.cf_data.update(input_data)
                 return self.async_create_entry(
                     title="EVSE Load Balancer",
                     data=self.cf_data,

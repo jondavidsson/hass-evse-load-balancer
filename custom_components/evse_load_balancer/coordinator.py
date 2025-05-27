@@ -18,10 +18,7 @@ from . import config_flow as cf
 from . import options_flow as of
 from .balancers.optimised_load_balancer import OptimisedLoadBalancer
 from .chargers.charger import Charger
-
-# Import constants from the main const.py file
 from .const import (
-    # Config and Options constants
     COORDINATOR_STATE_AWAITING_CHARGER,
     COORDINATOR_STATE_MONITORING_LOAD,
     DOMAIN,

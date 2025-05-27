@@ -80,11 +80,13 @@ class AminaCharger(Zigbee2Mqtt, Charger):
         """Set up the Amina charger."""
         await self.async_setup_mqtt()
 
-    async def set_phase_mode(self, mode: PhaseMode, _phase: Phase) -> None:
+    async def set_phase_mode(
+        self, mode: PhaseMode, _phase: Phase | None = None
+    ) -> None:
         """Set the phase mode of the charger."""
-        single_phase = False
+        single_phase = "disable"
         if mode == PhaseMode.SINGLE:
-            single_phase = True
+            single_phase = "enable"
 
         await self._async_mqtt_publish(
             topic=self._topic_set, payload={AminaPropertyMap.SinglePhase: single_phase}

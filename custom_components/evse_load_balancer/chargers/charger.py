@@ -41,7 +41,7 @@ class Charger(ABC):
         """Set up charger."""
 
     @abstractmethod
-    def set_phase_mode(self, mode: PhaseMode, phase: Phase) -> None:
+    def set_phase_mode(self, mode: PhaseMode, phase: Phase | None = None) -> None:
         """Set the phase mode of the charger."""
 
     @abstractmethod

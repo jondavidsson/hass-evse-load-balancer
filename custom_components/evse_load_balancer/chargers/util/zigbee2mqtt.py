@@ -1,5 +1,6 @@
 """Amina Charger implementation using direct MQTT communication."""
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -33,6 +34,7 @@ class Zigbee2Mqtt:
         self._topic_get_base: str = f"{self._topic_state}/get"
 
         self._mqtt_listener: CALLBACK_TYPE | None = None
+        self._pending_requests: dict[str, asyncio.Future[Any]] = {}
 
         """
         Property containing state cache.
@@ -76,10 +78,18 @@ class Zigbee2Mqtt:
         )
         try:
             payload_json = json.loads(msg.payload)
+            updated_properties: list[str] = []
             for key, value in payload_json.items():
                 if key in self._state_cache:
                     processed_value = self._serialize_value(value)
                     self._state_cache[key] = processed_value
+                    updated_properties.append(key)
+
+            # Resolve pending_requests futures (async_get_property calls)
+            for property_name in updated_properties:
+                prop_future = self._pending_requests.get(property_name, None)
+                if prop_future and not prop_future.done():
+                    prop_future.set_result(self._state_cache[property_name])
 
         except json.JSONDecodeError:
             _LOGGER.exception(
@@ -93,22 +103,40 @@ class Zigbee2Mqtt:
                 msg.topic,
             )
 
+    async def async_get_property(self, property_name: str, timeout: float = 5.0) -> Any:  # noqa: ASYNC109
+        """Get a property value with proper request-response correlation."""
+        response_future = self.hass.loop.create_future()
+        self._pending_requests[property_name] = response_future
+
+        try:
+            await self._async_mqtt_publish(
+                topic=self._topic_get_base, payload={property_name: ""}, qos=1
+            )
+            return await asyncio.wait_for(response_future, timeout)
+        except TimeoutError:
+            _LOGGER.warning("Timeout waiting for response to '%s'", property_name)
+            return None
+        finally:
+            self._pending_requests.pop(property_name, None)
+
     async def initialize_state_cache(self) -> None:
         """Initialize the state cache by requesting initial values via MQTT."""
         for state_key in self._state_cache:
-            get_topic = f"{self._topic_get_base}/{state_key}"
             _LOGGER.debug(
-                "Requesting initial state for '%s' on topic '%s'.",
+                "Requesting initial state for '%s'.",
                 state_key,
-                get_topic,
             )
             try:
-                await self._async_mqtt_publish(topic=get_topic, payload="", qos=1)
-            except Exception:
-                _LOGGER.exception(
-                    "Failed to publish GET for '%s' to '%s'",
+                self._state_cache[state_key] = await self.async_get_property(state_key)
+                _LOGGER.debug(
+                    'Update initial state for "%s": %s',
                     state_key,
-                    get_topic,
+                    self._state_cache[state_key],
+                )
+            except TimeoutError:
+                _LOGGER.warning(
+                    "Failed to receive initial value for '%s', timeout.'",
+                    state_key,
                 )
 
     def _mqtt_is_setup(self) -> bool:
@@ -157,3 +185,8 @@ class Zigbee2Mqtt:
 
         self._mqtt_listener()
         self._mqtt_listener = None
+
+        for future in self._pending_requests.values():
+            if not future.done():
+                future.cancel("MQTT connection unloaded before response received")
+        self._pending_requests.clear()

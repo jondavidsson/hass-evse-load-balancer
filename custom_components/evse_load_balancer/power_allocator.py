@@ -119,7 +119,8 @@ class PowerAllocator:
     def add_charger_and_initialize(self, charger: Charger) -> bool:
         """Add charger and immediately initialize."""
         if self.add_charger(charger):
-            self._chargers[charger.id].initialize()
+            return self._chargers[charger.id].initialize()
+        return False
 
     def remove_charger(self, charger: Charger) -> bool:
         """Remove a charger from the allocator."""

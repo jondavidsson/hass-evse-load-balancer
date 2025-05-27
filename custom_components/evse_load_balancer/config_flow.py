@@ -164,6 +164,11 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     cf_data: dict | None = None
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the config flow."""
+        super().__init__(*args, **kwargs)
+        self.cf_data = {}
+
     @staticmethod
     @callback
     def async_get_options_flow(

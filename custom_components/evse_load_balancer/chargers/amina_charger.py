@@ -56,11 +56,28 @@ class AminaCharger(Zigbee2Mqtt, Charger):
         device: DeviceEntry,
     ) -> None:
         """Initialize the Amina Charger instance."""
+        # These are the actual MQTT property names we want to cache and request.
+        mqtt_properties_to_cache = [
+            AminaPropertyMap.ChargeLimit,
+            AminaPropertyMap.SinglePhase,
+            AminaPropertyMap.EvConnected,
+            AminaPropertyMap.EvStatus,
+            AminaPropertyMap.Charging,
+        ]
+        # Define which of these properties can actually be fetched via a Z2M /get request
+        gettable_mqtt_properties = {
+            AminaPropertyMap.ChargeLimit,
+            AminaPropertyMap.SinglePhase,
+        }
+
+        initial_state_for_z2m = dict.fromkeys(mqtt_properties_to_cache, None)
+
         Zigbee2Mqtt.__init__(
             self,
             hass=hass,
             z2m_name=device.name,
-            state_cache=dict.fromkeys(vars(AminaPropertyMap).keys(), None),
+            state_cache=initial_state_for_z2m,
+            gettable_properties=gettable_mqtt_properties,
         )
         Charger.__init__(self, hass=hass, config_entry=config_entry, device=device)
 
@@ -101,12 +118,18 @@ class AminaCharger(Zigbee2Mqtt, Charger):
 
     def get_current_limit(self) -> dict[Phase, int] | None:
         """Get the current charger limit in amps from internal cache."""
-        current_limit = self._state_cache.get(AminaPropertyMap.ChargeLimit)
-        is_single_phase = self._state_cache.get(AminaPropertyMap.SinglePhase, False)
+        current_limit_val = self._state_cache.get(AminaPropertyMap.ChargeLimit)
+        is_single_phase_val = self._state_cache.get(AminaPropertyMap.SinglePhase)
 
-        if is_single_phase:
-            return {Phase.L1: current_limit, Phase.L2: 0, Phase.L3: 0}
-        return dict.fromkeys(Phase, current_limit)
+        if current_limit_val is None or is_single_phase_val is None:
+            return None
+
+        # Ensure current_limit_val is an int; it should be from MQTT if not None
+        current_limit_int = int(current_limit_val)
+
+        if is_single_phase_val:  # is_single_phase_val should be a boolean
+            return {Phase.L1: current_limit_int, Phase.L2: 0, Phase.L3: 0}
+        return dict.fromkeys(Phase, current_limit_int)
 
     def get_max_current_limit(self) -> dict[Phase, int] | None:
         """Get the hardware maximum current limit of the charger."""

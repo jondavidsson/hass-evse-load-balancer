@@ -24,6 +24,7 @@ class Zigbee2Mqtt:
         hass: HomeAssistant,
         z2m_name: str,
         state_cache: dict[str, Any],
+        gettable_properties: set[str] | None = None,
     ) -> None:
         """Init the base for chargers using Z2M."""
         self.hass = hass
@@ -43,6 +44,8 @@ class Zigbee2Mqtt:
         The values are the latest known state received on the topic.
         """
         self._state_cache = dict(state_cache)
+        # If gettable_properties is None, assume all properties in state_cache can be fetched. Otherwise, use the provided set.
+        self._gettable_properties = gettable_properties if gettable_properties is not None else set(self._state_cache.keys())
 
     async def async_setup_mqtt(self) -> None:
         """Subscribe to MQTT topics and request initial state. Called after __init__."""
@@ -103,7 +106,7 @@ class Zigbee2Mqtt:
                 msg.topic,
             )
 
-    async def async_get_property(self, property_name: str, timeout: float = 5.0) -> Any:  # noqa: ASYNC109
+    async def async_get_property(self, property_name: str, timeout: float = 7.0) -> Any:  # noqa: ASYNC109
         """Get a property value with proper request-response correlation."""
         response_future = self.hass.loop.create_future()
         self._pending_requests[property_name] = response_future
@@ -121,7 +124,10 @@ class Zigbee2Mqtt:
 
     async def initialize_state_cache(self) -> None:
         """Initialize the state cache by requesting initial values via MQTT."""
-        for state_key in self._state_cache:
+        # Only attempt to /get properties that are actually gettable
+        keys_to_get = self._gettable_properties.intersection(self._state_cache.keys())
+
+        for state_key in keys_to_get:
             _LOGGER.debug(
                 "Requesting initial state for '%s'.",
                 state_key,
@@ -157,7 +163,7 @@ class Zigbee2Mqtt:
 
         await mqtt.async_publish(self.hass, topic, payload=payload, qos=qos)
 
-    def _serialize_value(self, value: Any) -> str:
+    def _serialize_value(self, value: Any) -> Any:
         # Serialize possible boolean values
         if isinstance(value, str):
             if value.lower() in (

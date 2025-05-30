@@ -38,7 +38,7 @@
                     "charge_limit_hysteresis": "Hysteresis (Minutes)",
                     "max_fuse_load_amps": "Max Fuse Load Override (A)"
                 },
-                "description": "Adjust the behavior of the EVSE Load Balancer. For 'Max Fuse Load Override', a value of 0 means no override and the main fuse size will be used."
+                "description": "Adjust how many minutes the load balancer should wait before increasing a charger's limit. For 'Max Fuse Load Override', an empty value means no override and the initial main fuse size will be used."
             }
         },
         "error": {

@@ -36,6 +36,11 @@ class Charger(ABC):
     def is_charger_device(device: DeviceEntry) -> bool:
         """Check if given device is of class' type charger."""
 
+    @property
+    def id(self) -> str:
+        """Return the unique ID of the charger."""
+        return self.config_entry.entry_id
+
     @abstractmethod
     def async_setup(self) -> None:
         """Set up charger."""
@@ -43,6 +48,15 @@ class Charger(ABC):
     @abstractmethod
     def set_phase_mode(self, mode: PhaseMode, phase: Phase | None = None) -> None:
         """Set the phase mode of the charger."""
+
+    @abstractmethod
+    def has_synced_phase_limits(self) -> bool:
+        """
+        Return whether the charger has synced phase limits.
+
+        This means that the charger is able to set the current limit for each
+        phase independently.
+        """
 
     @abstractmethod
     async def set_current_limit(self, limit: dict[Phase, int]) -> None:

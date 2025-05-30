@@ -10,7 +10,7 @@
         "data": {
           "charge_limit_hysteresis": "Hysteresis (Minutes)"
         },
-        "description": "How long the available current must be above the current charger setting before increasing it. Averages values over this time period to avoid rapid changes."
+        "description": "How much time should have elapsed after a charger's last change before increasing it again."
       },
       "user": {
         "data": {

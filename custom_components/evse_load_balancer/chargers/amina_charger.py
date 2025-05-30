@@ -148,6 +148,10 @@ class AminaCharger(Zigbee2Mqtt, Charger):
             AminaStatusMap.ReadyToCharge,
         )
 
+    def has_synced_phase_limits(self) -> bool:
+        """Return whether the charger has synced phase limits."""
+        return True
+
     async def async_unload(self) -> None:
         """Unload the Amina charger."""
         await self.async_unload_mqtt()

@@ -29,6 +29,10 @@ class MockCharger(Charger):
         self._is_car_connected = False
         self._can_charge_state = False
 
+    def is_charger_device(self, device) -> bool:
+        """Check if the given device is a mock charger."""
+        return any(id_domain == "mock" for id_domain, _ in device.identifiers)
+
     def set_phase_mode(self, mode: PhaseMode, phase: Phase) -> None:
         """Set the phase mode of the charger."""
         pass  # Not needed for current tests
@@ -81,3 +85,11 @@ class MockCharger(Charger):
     def set_max_limits(self, limits: Dict[Phase, int]) -> None:
         """Manually set the max current limits for testing."""
         self._max_current_limit = limits.copy()
+
+    async def async_setup(self) -> None:
+        """Set up the mock charger."""
+        pass
+
+    async def async_unload(self) -> None:
+        """Unload the mock charger."""
+        pass

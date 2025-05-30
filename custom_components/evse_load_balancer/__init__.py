@@ -58,18 +58,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _LOGGER.debug("EVSE Load Balancer initialized for %s", entry.entry_id)
 
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    coordinator: EVSELoadBalancerCoordinator = hass.data[DOMAIN][entry.entry_id]
-    await coordinator.async_unload()
+    coordinator: EVSELoadBalancerCoordinator = hass.data[DOMAIN].get(entry.entry_id)
+    await coordinator.async_unload()  # Call coordinator's own unload method
+
+    # Unload platforms
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
+
+    if unloaded and coordinator:  # Ensure coordinator was found before trying to pop
         hass.data[DOMAIN].pop(entry.entry_id, None)
-    return True
+
+    return unloaded  # Return the result of unloading platforms

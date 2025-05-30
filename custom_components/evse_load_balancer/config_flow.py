@@ -24,7 +24,11 @@ from homeassistant.helpers.selector import (
 from packaging.version import parse as parse_version
 
 from .const import (
+    CHARGER_DOMAIN_EASEE,
+    CHARGER_DOMAIN_ZAPTEC,
+    CHARGER_MANUFACTURER_AMINA,
     DOMAIN,
+    HA_INTEGRATION_DOMAIN_MQTT,
     SUPPORTED_CHARGER_DEVICE_DOMAINS,
     SUPPORTED_METER_DEVICE_DOMAINS,
 )
@@ -45,15 +49,28 @@ CONF_CUSTOM_PHASE_CONFIG = "custom_phase_config"
 CONF_METER_DEVICE = "meter_device"
 CONF_CHARGER_DEVICE = "charger_device"
 
+_charger_device_filter_list: list[dict[str, str]] = []
+
+if CHARGER_DOMAIN_EASEE in SUPPORTED_CHARGER_DEVICE_DOMAINS:
+    _charger_device_filter_list.append({"integration": CHARGER_DOMAIN_EASEE})
+
+if CHARGER_DOMAIN_ZAPTEC in SUPPORTED_CHARGER_DEVICE_DOMAINS:
+    _charger_device_filter_list.append({"integration": CHARGER_DOMAIN_ZAPTEC})
+
+if HA_INTEGRATION_DOMAIN_MQTT in SUPPORTED_CHARGER_DEVICE_DOMAINS:
+    _charger_device_filter_list.append(
+        {
+            "integration": HA_INTEGRATION_DOMAIN_MQTT,
+            "manufacturer": CHARGER_MANUFACTURER_AMINA,
+        }
+    )
+
 STEP_INIT_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CHARGER_DEVICE): DeviceSelector(
             DeviceSelectorConfig(
                 multiple=False,
-                filter=[
-                    {"integration": domain}
-                    for domain in SUPPORTED_CHARGER_DEVICE_DOMAINS
-                ],
+                filter=_charger_device_filter_list,
             )
         ),
         vol.Required(CONF_FUSE_SIZE): NumberSelector(
@@ -145,7 +162,12 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 1
 
-    data = {}  # noqa: RUF012
+    cf_data: dict | None = None
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the config flow."""
+        super().__init__(*args, **kwargs)
+        self.cf_data = {}
 
     @staticmethod
     @callback
@@ -170,12 +192,12 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
             except ValidationExceptionError as ex:
                 errors[ex.base] = ex.key
             if not errors:
-                self.data = input_data
-                if self.data.get(CONF_CUSTOM_PHASE_CONFIG, False):
+                self.cf_data = input_data
+                if self.cf_data.get(CONF_CUSTOM_PHASE_CONFIG, False):
                     return await self.async_step_power()
                 return self.async_create_entry(
                     title="EVSE Load Balancer",
-                    data=self.data,
+                    data=self.cf_data,
                 )
 
         return self.async_show_form(
@@ -194,16 +216,16 @@ class EvseLoadBalancerConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             if not errors:
-                self.data = self.data | input_data
+                self.cf_data.update(input_data)
                 return self.async_create_entry(
                     title="EVSE Load Balancer",
-                    data=self.data,
+                    data=self.cf_data,
                 )
 
         return self.async_show_form(
             step_id="power",
             data_schema=create_phase_power_data_schema(
-                phase_count=self.data.get(CONF_PHASE_COUNT, 1)
+                phase_count=self.cf_data.get(CONF_PHASE_COUNT, 1)
             ),
             errors=errors,
         )

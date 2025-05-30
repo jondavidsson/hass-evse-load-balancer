@@ -51,14 +51,23 @@ class ZaptecCharger(HaDevice, Charger):
         Charger.__init__(self, hass, config_entry, device_entry)
         self.refresh_entities()
 
-    def set_phase_mode(self, mode: PhaseMode, _phase: Phase) -> None:
+    @staticmethod
+    def is_charger_device(device: DeviceEntry) -> bool:
+        """Check if the given device is a Zaptec charger."""
+        return any(
+            id_domain == CHARGER_DOMAIN_ZAPTEC for id_domain, _ in device.identifiers
+        )
+
+    async def async_setup(self) -> None:
+        """Set up the charger."""
+
+    def set_phase_mode(self, mode: PhaseMode, _phase: Phase | None = None) -> None:
         """Set the phase mode of the charger."""
         if mode not in PhaseMode:
             msg = "Invalid mode. Must be 'single' or 'multi'."
             raise ValueError(msg)
 
-        # TODO(Dirk): Implement the logic to set the phase mode for Easee # noqa: FIX002
-        # chargers.
+        # TODO(Dirk): Implement the logic to set the phase mode # noqa: FIX002
         # https://github.com/dirkgroenen/hass-evse-load-balancer/issues/9
 
     async def set_current_limit(self, limit: dict[Phase, int]) -> None:
@@ -150,3 +159,7 @@ class ZaptecCharger(HaDevice, Charger):
             ZaptecStatusMap.ConnectedCharging,
             ZaptecStatusMap.ConnectedFinished,
         )
+
+    async def async_unload(self) -> None:
+        """Unload the charger."""
+        # No specific unload logic

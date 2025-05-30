@@ -1,15 +1,13 @@
 """Main coordinator for load balacer."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  # Ensure datetime is imported
 from functools import cached_property
 from math import floor
 from time import time
 from typing import TYPE_CHECKING
 
-from homeassistant.components.sensor import (
-    SensorEntity,
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -49,8 +47,8 @@ MIN_CHARGER_UPDATE_DELAY: int = 30
 class EVSELoadBalancerCoordinator:
     """Coordinator for the EVSE Load Balancer."""
 
-    _last_check_timestamp: str = None
-
+    # MODIFIED: Store as datetime object or None
+    _last_check_timestamp: datetime | None = None
     _last_charger_target_update: tuple[dict[Phase, int], int] | None = None
 
     def __init__(
@@ -63,7 +61,6 @@ class EVSELoadBalancerCoordinator:
         """Initialize the coordinator."""
         self.hass: HomeAssistant = hass
         self.config_entry: ConfigEntry = config_entry
-
         self._unsub: list[CALLBACK_TYPE] = []
         self._sensors: list[SensorEntity] = []
 
@@ -78,7 +75,9 @@ class EVSELoadBalancerCoordinator:
         self._previous_current_availability: dict[Phase, int] | None = None
 
     async def async_setup(self) -> None:
-        """Set up the coordinator."""
+        """Set up the coordinator and its managed components."""
+        await self._charger.async_setup()
+
         self._unsub.append(
             async_track_time_interval(
                 self.hass,
@@ -99,23 +98,47 @@ class EVSELoadBalancerCoordinator:
         self._power_allocator.add_charger(charger=self._charger)
 
     async def async_unload(self) -> None:
-        """Unload the coordinator."""
-        for unsub in self._unsub:
-            unsub()
+        """Unload the coordinator and its managed components."""
+        await self._charger.async_unload()
+
+        for unsub_method in self._unsub:
+            unsub_method()
         self._unsub.clear()
 
     async def _handle_options_update(
-        self, hass: HomeAssistant, entry: ConfigEntry
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
     ) -> None:
+        """Handle options update by reloading the config entry."""
         await hass.config_entries.async_reload(entry.entry_id)
 
     def register_sensor(self, sensor: SensorEntity) -> None:
-        """Register a sensor to be updated."""
-        self._sensors.append(sensor)
+        """Register a sensor to be updated by the coordinator."""
+        if sensor not in self._sensors:
+            self._sensors.append(sensor)
 
     def unregister_sensor(self, sensor: SensorEntity) -> None:
         """Unregister a sensor."""
-        self._sensors.remove(sensor)
+        if sensor in self._sensors:
+            self._sensors.remove(sensor)
+
+    @property
+    def fuse_size(self) -> int:
+        """
+        Get the effective fuse size for load balancing.
+
+        Considers the main fuse size from initial setup (config_entry.data)
+        and the optional override from the integration's options (config_entry.options).
+        """
+        config_fuse_amps = self.config_entry.data.get(cf.CONF_FUSE_SIZE, 0)
+        options_fuse_amps = self.config_entry.options.get(
+            of.OPTION_MAX_FUSE_LOAD_AMPS, None
+        )
+
+        return int(
+            options_fuse_amps if options_fuse_amps is not None else config_fuse_amps
+        )
 
     def get_available_current_for_phase(self, phase: Phase) -> int | None:
         """Get the available current for a given phase."""
@@ -127,53 +150,50 @@ class EVSELoadBalancerCoordinator:
         )
 
     def _get_available_currents(self) -> dict[Phase, int] | None:
-        """Check all phases and return the available current."""
-        available_currents = {
-            phase: self.get_available_current_for_phase(phase)
-            for phase in self._available_phases
-        }
-        if None in available_currents.values():
-            _LOGGER.error(
-                "One of the available currents is None: %s.", available_currents
-            )
-            return None
+        """Check all phases and return the available current for each."""
+        available_currents = {}
+        for phase_obj in self._available_phases:
+            current = self.get_available_current_for_phase(phase_obj)
+            if current is None:
+                _LOGGER.error(
+                    "Available current for phase '%s' is None."
+                    "Cannot proceed with balancing cycle.",
+                    phase_obj.value,
+                )
+                return None
+            available_currents[phase_obj] = current
         return available_currents
 
     @cached_property
     def _available_phases(self) -> list[Phase]:
-        """Get the available phases based on the user's configuration."""
+        """Get the available phases based on the user's configuration (1 or 3 phase)."""
+        # Assumes CONF_PHASE_COUNT is stored in config_entry.data
         phase_count = int(self.config_entry.data.get(cf.CONF_PHASE_COUNT, 3))
         return list(Phase)[:phase_count]
 
     @property
-    def fuse_size(self) -> float:
-        """Get the fuse size."""
-        return self.config_entry.data.get(cf.CONF_FUSE_SIZE, 0)
-
-    @property
     def get_load_balancing_state(self) -> str:
-        """Get the load balancing state."""
+        """Get the current load balancing state."""
         if self._should_check_charger():
             return COORDINATOR_STATE_MONITORING_LOAD
         return COORDINATOR_STATE_AWAITING_CHARGER
 
     @property
-    def get_last_check_timestamp(self) -> str:
-        """Get the last check timestamp."""
+    def get_last_check_timestamp(self) -> datetime | None:
+        """Get the timestamp of the last check cycle."""
         return self._last_check_timestamp
 
     @callback
     def _execute_update_cycle(self, now: datetime) -> None:
-        """Execute the update cycle for the charger."""
+        """Execute the main update cycle for load balancing."""
         self._last_check_timestamp = datetime.now().astimezone()
         available_currents = self._get_available_currents()
+
+        self._async_update_sensors()
 
         if available_currents is None:
             _LOGGER.warning("Available current unknown. Cannot adjust limit.")
             return
-
-        # making data available to sensors
-        self._async_update_sensors()
 
         # Run the actual charger update
         if not self._should_check_charger():
@@ -220,12 +240,13 @@ class EVSELoadBalancerCoordinator:
         return False
 
     def _async_update_sensors(self) -> None:
+        """Update all registered sensor states."""
         for sensor in self._sensors:
-            if sensor.enabled:
+            if sensor.enabled and sensor.hass:
                 sensor.async_write_ha_state()
 
     def _should_check_charger(self) -> bool:
-        """Check if the charger should be checked for current limit changes."""
+        """Check if the charger is in a state where its limit should be managed."""
         return self._power_allocator.should_monitor()
 
     def _may_update_charger_settings(self, new_settings: dict[Phase, int]) -> bool:

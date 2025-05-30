@@ -30,7 +30,7 @@
 
 - **Dynamic Load Balancing**: Automatically adjusts the charging current of your EV charger based on the available power in your home.
 - **Broad Meter Support**: Works with DSMR-compatible meters or allows manual configuration based on existing entities for advanced setups.
-- **Flexible Charger Integration**: Compatible with a range of EV chargers, such as Easee, Zaptec, ....
+- **Flexible Charger Integration**: Compatible with a range of EV chargers, such as Easee, Zaptec, Amina, ....
 
 ### Roadmap
 
@@ -50,6 +50,7 @@
 ### EV Chargers
 - Easee Chargers (via [nordicopen/easee_hass](https://github.com/nordicopen/easee_hass))
 - Zaptec Chargers (via [custom-components/zaptec](https://github.com/custom-components/zaptec))
+- Amina S Chargers (via [Zigbee2MQTT/amina_S](https://www.zigbee2mqtt.io/devices/amina_S.html))
 - ... additional chargers to be added ...
 
 ## How It Works

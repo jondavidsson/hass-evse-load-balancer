@@ -44,7 +44,7 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
         LoadBalancerSensor,
         SensorEntityDescription(
             key=get_callable_name(EVSELoadBalancerCoordinator.get_load_balancing_state),
-            name="Load Balancing State",
+            translation_key="evse_load_balancing_state",
             options=list(COORDINATOR_STATES),
             device_class=SensorDeviceClass.ENUM,
             entity_registry_enabled_default=True,
@@ -54,7 +54,7 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
         LoadBalancerSensor,
         SensorEntityDescription(
             key=get_callable_name(EVSELoadBalancerCoordinator.get_last_check_timestamp),
-            name="Last Check",
+            translation_key="evse_last_check",
             device_class=SensorDeviceClass.TIMESTAMP,
             entity_registry_enabled_default=False,
         ),
@@ -63,6 +63,7 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
         LoadBalancerPhaseSensor,
         SensorEntityDescription(
             key=SENSOR_KEY_AVAILABLE_CURRENT_L1,
+            translation_key="evse_available_current_l1",
             device_class=SensorDeviceClass.CURRENT,
             suggested_display_precision=0,
             entity_registry_enabled_default=False,
@@ -72,6 +73,7 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
         LoadBalancerPhaseSensor,
         SensorEntityDescription(
             key=SENSOR_KEY_AVAILABLE_CURRENT_L2,
+            translation_key="evse_available_current_l2",
             device_class=SensorDeviceClass.CURRENT,
             suggested_display_precision=0,
             entity_registry_enabled_default=False,
@@ -81,6 +83,7 @@ SENSORS: tuple[tuple[SensorEntity, SensorEntityDescription], ...] = (
         LoadBalancerPhaseSensor,
         SensorEntityDescription(
             key=SENSOR_KEY_AVAILABLE_CURRENT_L3,
+            translation_key="evse_available_current_l3",
             device_class=SensorDeviceClass.CURRENT,
             suggested_display_precision=0,
             entity_registry_enabled_default=False,

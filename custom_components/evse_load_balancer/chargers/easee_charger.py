@@ -56,7 +56,17 @@ class EaseeCharger(HaDevice, Charger):
         Charger.__init__(self, hass, config_entry, device_entry)
         self.refresh_entities()
 
-    def set_phase_mode(self, mode: PhaseMode, _phase: Phase) -> None:
+    @staticmethod
+    def is_charger_device(device: DeviceEntry) -> bool:
+        """Check if the given device is an Easee charger."""
+        return any(
+            id_domain == CHARGER_DOMAIN_EASEE for id_domain, _ in device.identifiers
+        )
+
+    def async_setup(self) -> None:
+        """Set up the charger."""
+
+    def set_phase_mode(self, mode: PhaseMode, _phase: Phase | None = None) -> None:
         """Set the phase mode of the charger."""
         if mode not in PhaseMode:
             msg = "Invalid mode. Must be 'single' or 'multi'."
@@ -148,3 +158,7 @@ class EaseeCharger(HaDevice, Charger):
             EaseeStatusMap.Charging,
             EaseeStatusMap.ReadyToCharge,
         ]
+
+    async def async_unload(self) -> None:
+        """Unload the Easee charger."""
+        # No specific unload logic for Easee charger

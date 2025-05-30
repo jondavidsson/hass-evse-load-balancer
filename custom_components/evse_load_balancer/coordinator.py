@@ -144,7 +144,6 @@ class EVSELoadBalancerCoordinator:
             if active_current is not None
             else None
         )
-        return None
 
     def _get_available_currents(self) -> dict[Phase, int] | None:
         """Check all phases and return the available current for each."""

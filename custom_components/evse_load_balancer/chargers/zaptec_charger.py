@@ -157,5 +157,5 @@ class ZaptecCharger(HaDevice, Charger):
         )
 
     async def async_unload(self) -> None:
-        """Unload the Easee charger."""
+        """Unload the charger."""
         # No specific unload logic

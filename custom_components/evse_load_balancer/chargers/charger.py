@@ -42,7 +42,7 @@ class Charger(ABC):
         return self.config_entry.entry_id
 
     @abstractmethod
-    def async_setup(self) -> None:
+    async def async_setup(self) -> None:
         """Set up charger."""
 
     @abstractmethod

@@ -63,7 +63,7 @@ class EaseeCharger(HaDevice, Charger):
             id_domain == CHARGER_DOMAIN_EASEE for id_domain, _ in device.identifiers
         )
 
-    def async_setup(self) -> None:
+    async def async_setup(self) -> None:
         """Set up the charger."""
 
     def set_phase_mode(self, mode: PhaseMode, _phase: Phase | None = None) -> None:
@@ -161,4 +161,3 @@ class EaseeCharger(HaDevice, Charger):
 
     async def async_unload(self) -> None:
         """Unload the Easee charger."""
-        # No specific unload logic for Easee charger

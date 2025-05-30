@@ -14,6 +14,7 @@ def z2m(hass):
         hass=hass,
         z2m_name="test_device",
         state_cache={"power": None, "current": None, "is_connected": None},
+        gettable_properties=["current", "is_connected"]
     )
 
 
@@ -227,10 +228,12 @@ async def test_async_get_property_timeout(z2m):
 
 @pytest.mark.asyncio
 async def test_initialize_state_cache(z2m):
-    """Test initialize_state_cache requests all properties."""
+    """Test initialize_state_cache requests all properties defined as gettable_properties."""
+    called_properties = []
+
     async def mock_get_property(property_name, timeout=5.0):
+        called_properties.append(property_name)
         values = {
-            "power": 2000,
             "current": 8.5
         }
         return values.get(property_name)
@@ -240,8 +243,9 @@ async def test_initialize_state_cache(z2m):
         await z2m.initialize_state_cache()
 
         # Verify state cache was updated with all values
-        assert z2m._state_cache["power"] == 2000
         assert z2m._state_cache["current"] == 8.5
+
+    assert called_properties == z2m._gettable_properties
 
 
 @pytest.mark.asyncio
@@ -251,7 +255,7 @@ async def test_initialize_state_cache_handles_timeouts(z2m, caplog):
 
     # Mock async_get_property to simulate a timeout for one property
     async def mock_get_property(property_name, timeout=5.0):
-        if property_name == "power":
+        if property_name == "is_connected":
             raise TimeoutError()
         values = {
             "current": 8.5
@@ -261,8 +265,8 @@ async def test_initialize_state_cache_handles_timeouts(z2m, caplog):
     with patch.object(z2m, 'async_get_property', side_effect=mock_get_property):
         await z2m.initialize_state_cache()
         assert z2m._state_cache["current"] == 8.5
-        assert z2m._state_cache["power"] is None
-        assert "Failed to receive initial value for 'power'" in caplog.text
+        assert z2m._state_cache["is_connected"] is None
+        assert "Failed to receive initial value for 'is_connected'" in caplog.text
 
 
 @pytest.mark.asyncio

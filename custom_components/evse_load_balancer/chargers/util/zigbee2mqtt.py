@@ -17,7 +17,22 @@ Z2M_BASE_TOPIC_ROOT = "zigbee2mqtt"
 
 
 class Zigbee2Mqtt:
-    """Representation of an Amina S Charger using MQTT."""
+    """
+    Base Zigbee2Mqtt class used for chargers that communicate via Zigbee2MQTT.
+
+    Initialise the class with a default "state_cache", which will then be used
+    to store the latest known state of the charger when any message is published.
+
+    Provide an additional set of "gettable_properties" to specify which properties
+    can be fetched via a /get request. These will be fetched during initialization.
+    When not provided, initialization will be ignored.
+
+    @param hass: HomeAssistant instance.
+    @param z2m_name: The name of the Zigbee2MQTT device.
+    @param state_cache: A dictionary containing the initial state of the charger.
+    @param gettable_properties: A set of property names that can be fetched via /get
+           requests. Leave empty to not initialize any properties.
+    """
 
     def __init__(
         self,
@@ -44,8 +59,7 @@ class Zigbee2Mqtt:
         The values are the latest known state received on the topic.
         """
         self._state_cache = dict(state_cache)
-        # If gettable_properties is None, assume all properties in state_cache can be fetched. Otherwise, use the provided set.
-        self._gettable_properties = gettable_properties if gettable_properties is not None else set(self._state_cache.keys())
+        self._gettable_properties = gettable_properties
 
     async def async_setup_mqtt(self) -> None:
         """Subscribe to MQTT topics and request initial state. Called after __init__."""
@@ -124,10 +138,10 @@ class Zigbee2Mqtt:
 
     async def initialize_state_cache(self) -> None:
         """Initialize the state cache by requesting initial values via MQTT."""
-        # Only attempt to /get properties that are actually gettable
-        keys_to_get = self._gettable_properties.intersection(self._state_cache.keys())
+        if self._gettable_properties is None:
+            return
 
-        for state_key in keys_to_get:
+        for state_key in self._gettable_properties:
             _LOGGER.debug(
                 "Requesting initial state for '%s'.",
                 state_key,

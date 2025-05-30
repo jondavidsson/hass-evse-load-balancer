@@ -1,5 +1,8 @@
 """Amina Charger implementation using direct MQTT communication."""
 
+from enum import StrEnum, unique
+from typing import Self
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant  # State might not be used directly here
 from homeassistant.helpers.device_registry import DeviceEntry
@@ -16,7 +19,8 @@ from .util.zigbee2mqtt import (
 )
 
 
-class AminaPropertyMap:
+@unique
+class AminaPropertyMap(StrEnum):
     """
     Map Easee properties.
 
@@ -29,8 +33,16 @@ class AminaPropertyMap:
     EvStatus = "ev_status"
     Charging = "charging"
 
+    def gettable() -> set[Self]:
+        """Define properties that can be fetched via a /get request."""
+        return (
+            AminaPropertyMap.ChargeLimit,
+            AminaPropertyMap.SinglePhase,
+        )
 
-class AminaStatusMap:
+
+@unique
+class AminaStatusMap(StrEnum):
     """
     Map Amina charger statuses to their respective string representations.
 
@@ -56,28 +68,12 @@ class AminaCharger(Zigbee2Mqtt, Charger):
         device: DeviceEntry,
     ) -> None:
         """Initialize the Amina Charger instance."""
-        # These are the actual MQTT property names we want to cache and request.
-        mqtt_properties_to_cache = [
-            AminaPropertyMap.ChargeLimit,
-            AminaPropertyMap.SinglePhase,
-            AminaPropertyMap.EvConnected,
-            AminaPropertyMap.EvStatus,
-            AminaPropertyMap.Charging,
-        ]
-        # Define which of these properties can actually be fetched via a Z2M /get request
-        gettable_mqtt_properties = {
-            AminaPropertyMap.ChargeLimit,
-            AminaPropertyMap.SinglePhase,
-        }
-
-        initial_state_for_z2m = dict.fromkeys(mqtt_properties_to_cache, None)
-
         Zigbee2Mqtt.__init__(
             self,
             hass=hass,
             z2m_name=device.name,
-            state_cache=initial_state_for_z2m,
-            gettable_properties=gettable_mqtt_properties,
+            state_cache=dict.fromkeys([e.value for e in AminaPropertyMap], None),
+            gettable_properties=[e.value for e in AminaPropertyMap.gettable()],
         )
         Charger.__init__(self, hass=hass, config_entry=config_entry, device=device)
 
@@ -124,10 +120,9 @@ class AminaCharger(Zigbee2Mqtt, Charger):
         if current_limit_val is None or is_single_phase_val is None:
             return None
 
-        # Ensure current_limit_val is an int; it should be from MQTT if not None
         current_limit_int = int(current_limit_val)
 
-        if is_single_phase_val:  # is_single_phase_val should be a boolean
+        if is_single_phase_val:
             return {Phase.L1: current_limit_int, Phase.L2: 0, Phase.L3: 0}
         return dict.fromkeys(Phase, current_limit_int)
 

@@ -59,6 +59,10 @@ def amina_charger(hass, config_entry, device_entry):
     return AminaCharger(hass, config_entry, device_entry)
 
 
+def test_correct_gettable_prop_initialization(amina_charger):
+    assert amina_charger._gettable_properties == ["charge_limit", "single_phase"]
+
+
 def test_is_charger_device_true():
     device_entry = _make_device_entry(
         domain=HA_INTEGRATION_DOMAIN_MQTT,

@@ -1,4 +1,5 @@
 {
   "name": "EVSE Load Balancer",
-  "homeassistant": "2024.9.2"
+  "homeassistant": "2024.9.2",
+  "zip_release": false
 }

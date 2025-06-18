@@ -90,14 +90,16 @@ This adaptive approach allows the EVSE Load Balancer to optimize charging power 
 
 During setup, you will be prompted to:
 - Select your EV charger.
-- Select your energy meter or provide custom sensors.
+- Select your energy meter or provide custom sensors
 - Specify the fuse size and number of phases in your home.
 
 ### Advanced Configuration
 For homes without a compatible energy meter, you can manually configure sensors for each phase, including:
-- Power consumption
-- Power production
+- Power consumption (in **kW**)
+- Power production (in **kW**)
 - Voltage
+
+> 💡 Tip: If you only have one sensor that shows both consumption and production (e.g. an active power sensor), you can set it as the Consumption Sensor. Then, create a Helper Sensor with a fixed value of `0` to use as the Production Sensor.
 
 ## Events and Logging
 

@@ -29,7 +29,7 @@
 ## Features
 
 - **Dynamic Load Balancing**: Automatically adjusts the charging current of your EV charger based on the available power in your home.
-- **Broad Meter Support**: Works with DSMR-compatible meters or allows manual configuration based on existing entities for advanced setups.
+- **Broad Meter Support**: Works with several meters like DSMR or HomeWizard, and allows manual configuration based on existing entities for advanced setups.
 - **Flexible Charger Integration**: Compatible with a range of EV chargers, such as Easee, Zaptec, Amina, ....
 
 ### Roadmap
@@ -45,12 +45,15 @@
 
 ### Energy Meters
 - DSMR-compatible meters (via [DSMR Smart Meter](https://www.home-assistant.io/integrations/dsmr/))
+- HomeWizard meters (via [HomeWizard](https://www.home-assistant.io/integrations/homewizard/))
 - Custom configurations using existing Home Assistant sensors (1-3 Phase support)
 
 ### EV Chargers
 - Easee Chargers (via [nordicopen/easee_hass](https://github.com/nordicopen/easee_hass))
 - Zaptec Chargers (via [custom-components/zaptec](https://github.com/custom-components/zaptec))
 - Amina S Chargers (via [Zigbee2MQTT/amina_S](https://www.zigbee2mqtt.io/devices/amina_S.html))
+- Lektrico Chargers (via [lektrico](https://www.home-assistant.io/integrations/lektrico/))
+- Keba Charging Station (BMW Wallbox) (via [keba](https://www.home-assistant.io/integrations/keba/))
 - ... additional chargers to be added ...
 
 ## How It Works
@@ -77,9 +80,6 @@ This adaptive approach allows the EVSE Load Balancer to optimize charging power 
 ### HACS installation
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dirkgroenen&repository=hass-evse-load-balancer)
 
-> **Note:** As this component is currently in beta, you'll need to add it as a custom repository in HACS first. Follow the instructions provided by [HACS on custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/). Use `dirkgroenen/hass-evse-load-balancer` as the repository URL and select "Integration" as the category.
-
-
 1. Search for "EVSE Load Balancer" in **HACS > Integrations**
 2. Download the integration and restart Home Assistant.
 3. Add the integration via **Settings > Devices & Services > Add Integration** and search for "EVSE Load Balancer."
@@ -93,14 +93,16 @@ This adaptive approach allows the EVSE Load Balancer to optimize charging power 
 
 During setup, you will be prompted to:
 - Select your EV charger.
-- Select your energy meter or provide custom sensors.
+- Select your energy meter or provide custom sensors
 - Specify the fuse size and number of phases in your home.
 
 ### Advanced Configuration
 For homes without a compatible energy meter, you can manually configure sensors for each phase, including:
-- Power consumption
-- Power production
+- Power consumption (in **kW**)
+- Power production (in **kW**)
 - Voltage
+
+> 💡 Tip: If you only have one sensor that shows both consumption and production (e.g. an active power sensor), you can set it as the Consumption Sensor. Then, create a Helper Sensor with a fixed value of `0` to use as the Production Sensor.
 
 ## Events and Logging
 

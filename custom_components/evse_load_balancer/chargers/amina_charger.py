@@ -107,7 +107,14 @@ class AminaCharger(Zigbee2Mqtt, Charger):
 
     async def set_current_limit(self, limit: dict[Phase, int]) -> None:
         """Set the charger limit."""
-        current_value = min(*limit.values(), AMINA_HW_MAX_CURRENT)
+        requested_current = max(limit.values()) if limit.values() else 0
+        
+        # Hardware validation: below min current = stop charging (0A)
+        if 0 < requested_current < AMINA_HW_MIN_CURRENT:
+            current_value = 0
+        else:
+            current_value = min(requested_current, AMINA_HW_MAX_CURRENT)
+            
         await self._async_mqtt_publish(
             topic=self._topic_set, payload={AminaPropertyMap.ChargeLimit: current_value}
         )

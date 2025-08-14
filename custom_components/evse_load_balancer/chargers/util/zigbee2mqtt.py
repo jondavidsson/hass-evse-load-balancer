@@ -120,7 +120,7 @@ class Zigbee2Mqtt:
                 msg.topic,
             )
 
-    async def async_get_property(self, property_name: str, timeout: float = 15.0) -> Any:  # noqa: ASYNC109
+    async def async_get_property(self, property_name: str, timeout: float = 7.0) -> Any:  # noqa: ASYNC109
         """Get a property value with proper request-response correlation."""
         response_future = self.hass.loop.create_future()
         self._pending_requests[property_name] = response_future

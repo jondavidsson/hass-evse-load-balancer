@@ -251,24 +251,33 @@ class EVSELoadBalancerCoordinator:
         _LOGGER.info("DEBUG: SHOULD act upon availability - proceeding with power allocation")
         _LOGGER.info("DEBUG: About to call power_allocator.update_allocation with: %s", computed_availability)
         
-        # Convert absolute limits to relative changes for PowerAllocator
-        # PowerAllocator expects negative values for reductions, positive for increases
-        relative_currents = {}
-        current_limits = self._charger.get_current_limit()
-        if current_limits:
-            for phase, target_limit in computed_availability.items():
-                current_limit = current_limits.get(phase, 0)
-                relative_change = target_limit - current_limit
-                relative_currents[phase] = relative_change
-            _LOGGER.info("DEBUG: Converted to relative currents: %s (target=%s, current=%s)", 
-                         relative_currents, computed_availability, current_limits)
+        # Check if we're using price-aware balancer and it's actively limiting
+        if isinstance(self._balancer_algo, PriceAwareLoadBalancer) and self._balancer_algo.is_price_limiting_active():
+            # Price-aware returns absolute limits, convert to relative changes for PowerAllocator
+            # PowerAllocator expects negative values for reductions, positive for increases
+            relative_currents = {}
+            current_limits = self._charger.get_current_limit()
+            if current_limits:
+                for phase, target_limit in computed_availability.items():
+                    current_limit = current_limits.get(phase, 0)
+                    relative_change = target_limit - current_limit
+                    relative_currents[phase] = relative_change
+                _LOGGER.info("DEBUG: Price-aware mode - converted to relative currents: %s (target=%s, current=%s)", 
+                             relative_currents, computed_availability, current_limits)
+                allocation_results = self._power_allocator.update_allocation(
+                    available_currents=relative_currents
+                )
+            else:
+                _LOGGER.warning("No current limits available for price-aware conversion, using absolute values")
+                allocation_results = self._power_allocator.update_allocation(
+                    available_currents=computed_availability
+                )
         else:
-            relative_currents = computed_availability
-            _LOGGER.info("DEBUG: No current limits available, using absolute values: %s", relative_currents)
-        
-        allocation_results = self._power_allocator.update_allocation(
-            available_currents=relative_currents
-        )
+            # OptimisedLoadBalancer returns relative changes, use directly
+            _LOGGER.info("DEBUG: Standard mode - using relative changes from OptimisedLoadBalancer: %s", computed_availability)
+            allocation_results = self._power_allocator.update_allocation(
+                available_currents=computed_availability
+            )
         _LOGGER.info("DEBUG: power_allocator.update_allocation returned: %s", allocation_results)
 
         # Allocator has been build to support multiple chargers. Right now

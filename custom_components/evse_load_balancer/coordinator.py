@@ -94,13 +94,13 @@ class EVSELoadBalancerCoordinator:
             )
             price_threshold = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_PRICE_THRESHOLD_PERCENTILE
-            )
+            ) / 100.0  # Convert percentage to decimal
             price_upper = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_PRICE_UPPER_PERCENTILE
-            )
+            ) / 100.0  # Convert percentage to decimal
             high_price_percentage = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_HIGH_PRICE_CHARGE_PERCENTAGE
-            )
+            ) / 100.0  # Convert percentage to decimal
             
             self._balancer_algo = PriceAwareLoadBalancer(
                 hass=self.hass,

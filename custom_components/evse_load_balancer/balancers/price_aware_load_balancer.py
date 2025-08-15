@@ -27,9 +27,9 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
         hold_off_period: int = 30,
         price_hysteresis_period: int = 5,
         nord_pool_entity_id: str | None = None,
-        price_threshold_percentile: float = 0.3,
-        price_upper_percentile: float = 0.8,
-        high_price_charge_percentage: float = 0.25,
+        price_threshold_percentile: float,
+        price_upper_percentile: float,
+        high_price_charge_percentage: float,
     ) -> None:
         """
         Initialize the price-aware load balancer.
@@ -40,9 +40,9 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
             hold_off_period: Period between updates before returning new value (seconds)
             price_hysteresis_period: Hysteresis period for price changes (minutes)
             nord_pool_entity_id: Entity ID of the Nord Pool sensor (optional)
-            price_threshold_percentile: Percentile threshold for low price (30 = bottom 30%)
-            price_upper_percentile: Percentile threshold for no charging (80 = top 20%)
-            high_price_charge_percentage: Percentage of max power during medium prices (25 = 25%)
+            price_threshold_percentile: Percentile threshold for low price (0.0-1.0)
+            price_upper_percentile: Percentile threshold for no charging (0.0-1.0)
+            high_price_charge_percentage: Percentage of max power during medium prices (0.0-1.0)
         """
         super().__init__(max_limits=max_limits, hold_off_period=hold_off_period)
         self._hass = hass

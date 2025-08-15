@@ -94,21 +94,31 @@ class EVSELoadBalancerCoordinator:
             )
             price_threshold = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_PRICE_THRESHOLD_PERCENTILE
-            ) / 100.0  # Convert percentage to decimal
+            )
             price_upper = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_PRICE_UPPER_PERCENTILE
-            ) / 100.0  # Convert percentage to decimal
+            )
             high_price_percentage = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_HIGH_PRICE_CHARGE_PERCENTAGE
-            ) / 100.0  # Convert percentage to decimal
+            )
+            
+            # Ensure we have valid values and convert percentages to decimals
+            if price_threshold is None or price_upper is None or high_price_percentage is None:
+                _LOGGER.error("Price-aware configuration incomplete, falling back to standard load balancer")
+                self._balancer_algo = OptimisedLoadBalancer(max_limits=max_limits)
+                return
+                
+            price_threshold_decimal = price_threshold / 100.0
+            price_upper_decimal = price_upper / 100.0
+            high_price_decimal = high_price_percentage / 100.0
             
             self._balancer_algo = PriceAwareLoadBalancer(
                 hass=self.hass,
                 max_limits=max_limits,
                 nord_pool_entity_id=nord_pool_entity if nord_pool_entity else None,
-                price_threshold_percentile=price_threshold,
-                price_upper_percentile=price_upper,
-                high_price_charge_percentage=high_price_percentage,
+                price_threshold_percentile=price_threshold_decimal,
+                price_upper_percentile=price_upper_decimal,
+                high_price_charge_percentage=high_price_decimal,
             )
             await self._balancer_algo.async_setup()
         else:

@@ -253,14 +253,9 @@ class EVSELoadBalancerCoordinator:
             now=now.timestamp(),
         )
 
-        _LOGGER.info("DEBUG: computed_availability=%s", computed_availability)
         if not self._should_act_upon_availability(currents=computed_availability):
-            _LOGGER.info("DEBUG: Should NOT act upon availability - skipping power allocation")
             return
 
-        _LOGGER.info("DEBUG: SHOULD act upon availability - proceeding with power allocation")
-        _LOGGER.info("DEBUG: About to call power_allocator.update_allocation with: %s", computed_availability)
-        
         # Check if we're using price-aware balancer and it's actively limiting
         if isinstance(self._balancer_algo, PriceAwareLoadBalancer) and self._balancer_algo.is_price_limiting_active():
             # Price-aware returns absolute limits, convert to relative changes for PowerAllocator
@@ -272,8 +267,6 @@ class EVSELoadBalancerCoordinator:
                     current_limit = current_limits.get(phase, 0)
                     relative_change = target_limit - current_limit
                     relative_currents[phase] = relative_change
-                _LOGGER.info("DEBUG: Price-aware mode - converted to relative currents: %s (target=%s, current=%s)", 
-                             relative_currents, computed_availability, current_limits)
                 allocation_results = self._power_allocator.update_allocation(
                     available_currents=relative_currents
                 )
@@ -284,30 +277,22 @@ class EVSELoadBalancerCoordinator:
                 )
         else:
             # OptimisedLoadBalancer returns relative changes, use directly
-            _LOGGER.info("DEBUG: Standard mode - using relative changes from OptimisedLoadBalancer: %s", computed_availability)
             allocation_results = self._power_allocator.update_allocation(
                 available_currents=computed_availability
             )
-        _LOGGER.info("DEBUG: power_allocator.update_allocation returned: %s", allocation_results)
-
+        
         # Allocator has been build to support multiple chargers. Right now
         # the coordinator only supports one charger. So we need to
         # iterate over the allocation results and update the charger
         # with the results. Just a bit of prep for the future...
         allocation_result = allocation_results.get(self._charger.id, None)
-        _LOGGER.info("DEBUG: allocation_result=%s, may_update=%s", 
-                     allocation_result, 
-                     self._may_update_charger_settings(allocation_result) if allocation_result else False)
         if allocation_result and self._may_update_charger_settings(allocation_result):
-            _LOGGER.info("DEBUG: Updating charger settings to: %s", allocation_result)
             self._update_charger_settings(allocation_result)
             self._power_allocator.update_applied_current(
                 charger_id=self._charger.id,
                 applied_current=allocation_result,
                 timestamp=now.timestamp(),
             )
-        else:
-            _LOGGER.info("DEBUG: NOT updating charger - allocation_result=%s", allocation_result)
 
     def _should_act_upon_availability(self, currents: dict[Phase, int]) -> bool:
         """Check if any of the current values have changed and should be acted upon."""

@@ -33,12 +33,23 @@
     "options": {
         "step": {
             "init": {
-                "title": "Inställningar för EVSE lastbalanserare",
+                "title": "Lastbalanseringsinställningar",
                 "data": {
                     "charge_limit_hysteresis": "Hysteres (minuter)",
-                    "max_fuse_load_amps": "Maximal säkringsbelastning (A)"
+                    "max_fuse_load_amps": "Maximal säkringsbelastning (A)",
+                    "enable_price_aware": "Aktivera smart elprisstyring"
                 },
-                "description": "Justera beteendet för EVSE lastbalanseraren. För 'Maximal säkringsbelastning' betyder värdet 0 ingen åsidosättning och huvudsäkringens storlek kommer att användas."
+                "description": "Konfigurera grundläggande lastbalanseringsinställningar. Smart elprisstyring gör att systemet minskar laddningseffekten under dyra perioder för att spara pengar."
+            },
+            "price_aware": {
+                "title": "Inställningar för smart elprisstyring",
+                "data": {
+                    "nord_pool_entity": "Nord Pool prissensor",
+                    "price_threshold_percentile": "Tröskelvärde för lågt pris (%)",
+                    "price_upper_percentile": "Tröskelvärde för stoppning (%)",
+                    "high_price_charge_percentage": "Effekt vid medelpriser (%)"
+                },
+                "description": "Konfigurera hur systemet reagerar på elpriser. Låga priser = full laddning, medelpriser = reducerad effekt, mycket höga priser = ingen laddning."
             }
         },
         "error": {

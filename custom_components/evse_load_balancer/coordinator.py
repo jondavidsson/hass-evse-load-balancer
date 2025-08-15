@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from . import config_flow as cf
 from . import options_flow as of
 from .balancers.optimised_load_balancer import OptimisedLoadBalancer
+from .balancers.price_aware_load_balancer import PriceAwareLoadBalancer
 from .chargers.charger import Charger
 from .const import (
     COORDINATOR_STATE_AWAITING_CHARGER,
@@ -81,9 +82,39 @@ class EVSELoadBalancerCoordinator:
         )
 
         max_limits = dict.fromkeys(self._available_phases, self.fuse_size)
-        self._balancer_algo = OptimisedLoadBalancer(
-            max_limits=max_limits,
+        
+        # Check if price-aware charging is enabled
+        price_aware_enabled = of.EvseLoadBalancerOptionsFlow.get_option_value(
+            self.config_entry, of.OPTION_ENABLE_PRICE_AWARE
         )
+        
+        if price_aware_enabled:
+            nord_pool_entity = of.EvseLoadBalancerOptionsFlow.get_option_value(
+                self.config_entry, of.OPTION_NORD_POOL_ENTITY
+            )
+            price_threshold = of.EvseLoadBalancerOptionsFlow.get_option_value(
+                self.config_entry, of.OPTION_PRICE_THRESHOLD_PERCENTILE
+            )
+            price_upper = of.EvseLoadBalancerOptionsFlow.get_option_value(
+                self.config_entry, of.OPTION_PRICE_UPPER_PERCENTILE
+            )
+            high_price_percentage = of.EvseLoadBalancerOptionsFlow.get_option_value(
+                self.config_entry, of.OPTION_HIGH_PRICE_CHARGE_PERCENTAGE
+            )
+            
+            self._balancer_algo = PriceAwareLoadBalancer(
+                hass=self.hass,
+                max_limits=max_limits,
+                nord_pool_entity_id=nord_pool_entity if nord_pool_entity else None,
+                price_threshold_percentile=price_threshold,
+                price_upper_percentile=price_upper,
+                high_price_charge_percentage=high_price_percentage,
+            )
+            await self._balancer_algo.async_setup()
+        else:
+            self._balancer_algo = OptimisedLoadBalancer(
+                max_limits=max_limits,
+            )
 
         self._power_allocator = PowerAllocator()
         self._power_allocator.add_charger(charger=self._charger)
@@ -212,28 +243,63 @@ class EVSELoadBalancerCoordinator:
             now=now.timestamp(),
         )
 
+        _LOGGER.info("DEBUG: computed_availability=%s", computed_availability)
         if not self._should_act_upon_availability(currents=computed_availability):
+            _LOGGER.info("DEBUG: Should NOT act upon availability - skipping power allocation")
             return
 
+        _LOGGER.info("DEBUG: SHOULD act upon availability - proceeding with power allocation")
+        _LOGGER.info("DEBUG: About to call power_allocator.update_allocation with: %s", computed_availability)
+        
+        # Convert absolute limits to relative changes for PowerAllocator
+        # PowerAllocator expects negative values for reductions, positive for increases
+        relative_currents = {}
+        current_limits = self._charger.get_current_limit()
+        if current_limits:
+            for phase, target_limit in computed_availability.items():
+                current_limit = current_limits.get(phase, 0)
+                relative_change = target_limit - current_limit
+                relative_currents[phase] = relative_change
+            _LOGGER.info("DEBUG: Converted to relative currents: %s (target=%s, current=%s)", 
+                         relative_currents, computed_availability, current_limits)
+        else:
+            relative_currents = computed_availability
+            _LOGGER.info("DEBUG: No current limits available, using absolute values: %s", relative_currents)
+        
         allocation_results = self._power_allocator.update_allocation(
-            available_currents=computed_availability
+            available_currents=relative_currents
         )
+        _LOGGER.info("DEBUG: power_allocator.update_allocation returned: %s", allocation_results)
 
         # Allocator has been build to support multiple chargers. Right now
         # the coordinator only supports one charger. So we need to
         # iterate over the allocation results and update the charger
         # with the results. Just a bit of prep for the future...
         allocation_result = allocation_results.get(self._charger.id, None)
+        _LOGGER.info("DEBUG: allocation_result=%s, may_update=%s", 
+                     allocation_result, 
+                     self._may_update_charger_settings(allocation_result) if allocation_result else False)
         if allocation_result and self._may_update_charger_settings(allocation_result):
+            _LOGGER.info("DEBUG: Updating charger settings to: %s", allocation_result)
             self._update_charger_settings(allocation_result)
             self._power_allocator.update_applied_current(
                 charger_id=self._charger.id,
                 applied_current=allocation_result,
                 timestamp=now.timestamp(),
             )
+        else:
+            _LOGGER.info("DEBUG: NOT updating charger - allocation_result=%s", allocation_result)
 
     def _should_act_upon_availability(self, currents: dict[Phase, int]) -> bool:
         """Check if any of the current values have changed and should be acted upon."""
+        # Check if we're using price-aware balancer and if price limiting is active
+        from .balancers.price_aware_load_balancer import PriceAwareLoadBalancer
+        if isinstance(self._balancer_algo, PriceAwareLoadBalancer):
+            if self._balancer_algo.is_price_limiting_active():
+                # During price limiting periods, always act to ensure charger gets updated
+                self._previous_current_availability = currents
+                return True
+        
         if self._previous_current_availability is None:
             self._previous_current_availability = currents
             return True

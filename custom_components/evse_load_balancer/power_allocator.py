@@ -155,8 +155,16 @@ class PowerAllocator:
             Dict mapping charger_id to new current limits (empty if no updates)
 
         """
+        _LOGGER.info("DEBUG: PowerAllocator.update_allocation called with: %s", available_currents)
+        _LOGGER.info("DEBUG: self._chargers keys: %s", list(self._chargers.keys()) if self._chargers else "No chargers")
+        _LOGGER.info("DEBUG: self._active_chargers keys: %s", list(self._active_chargers.keys()) if self._active_chargers else "No active chargers")
+        
         if not self._active_chargers:
+            _LOGGER.info("DEBUG: No active chargers - returning empty dict")
             return {}
+
+        _LOGGER.info("DEBUG: Active chargers: %s", list(self._active_chargers.keys()))
+        _LOGGER.info("DEBUG: Available currents: %s", available_currents)
 
         # Check for initialized chargers and manual overrides
         for state in self._chargers.values():
@@ -167,14 +175,18 @@ class PowerAllocator:
 
         # Allocate current based on strategy
         allocated_currents = self._allocate_current(available_currents)
+        _LOGGER.info("DEBUG: allocated_currents = %s", allocated_currents)
 
         # Create result dictionary for chargers that need updating
         result = {}
         for charger_id, new_limits in allocated_currents.items():
             state = self._chargers[charger_id]
             current_setting = state.charger.get_current_limit()
+            _LOGGER.info("DEBUG: charger_id=%s, current_setting=%s, new_limits=%s", 
+                         charger_id, current_setting, new_limits)
 
             if not current_setting:
+                _LOGGER.info("DEBUG: No current_setting for charger %s - skipping", charger_id)
                 continue
 
             # Check if update is needed
@@ -183,15 +195,21 @@ class PowerAllocator:
                 min_current = min(current_setting.values())
                 min_new = min(new_limits.values()) if new_limits else min_current
                 has_changes = min_new != min_current
+                _LOGGER.info("DEBUG: Synced phases - min_current=%s, min_new=%s, has_changes=%s", 
+                             min_current, min_new, has_changes)
             else:
                 has_changes = any(
                     new_limits[phase] != current_setting[phase] for phase in new_limits
                 )
+                _LOGGER.info("DEBUG: Non-synced phases - has_changes=%s", has_changes)
 
             if has_changes:
                 result[charger_id] = new_limits
                 state.last_calculated_current = dict(new_limits)
                 state.manual_override_detected = False
+                _LOGGER.info("DEBUG: Adding charger %s to result with new_limits=%s", charger_id, new_limits)
+            else:
+                _LOGGER.info("DEBUG: No changes needed for charger %s", charger_id)
 
         return result
 

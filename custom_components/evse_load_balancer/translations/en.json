@@ -33,12 +33,23 @@
     "options": {
         "step": {
             "init": {
-                "title": "EVSE Load Balancer Options",
+                "title": "Load Balancer Settings",
                 "data": {
                     "charge_limit_hysteresis": "Hysteresis (Minutes)",
-                    "max_fuse_load_amps": "Max Fuse Load Override (A)"
+                    "max_fuse_load_amps": "Max Fuse Load Override (A)",
+                    "enable_price_aware": "Enable Smart Electricity Pricing"
                 },
-                "description": "Adjust how many minutes the load balancer should wait before increasing a charger's limit. For 'Max Fuse Load Override', an empty value means no override and the initial main fuse size will be used."
+                "description": "Configure basic load balancer settings. Smart electricity pricing allows the system to reduce charging power during expensive periods to save money."
+            },
+            "price_aware": {
+                "title": "Smart Electricity Pricing Settings",
+                "data": {
+                    "nord_pool_entity": "Nord Pool Price Sensor",
+                    "price_threshold_percentile": "Low Price Threshold (%)",
+                    "price_upper_percentile": "Stop Charging Threshold (%)",
+                    "high_price_charge_percentage": "Power During Medium Prices (%)"
+                },
+                "description": "Configure how the system responds to electricity prices. Low prices = full charging, medium prices = reduced power, very high prices = no charging."
             }
         },
         "error": {

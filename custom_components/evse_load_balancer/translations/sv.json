@@ -2,7 +2,7 @@
     "title": "EVSE Lastbalanserare",
     "config": {
         "error": {
-            "metering_selection_required": "Ange antingen en smart mätare eller välj 'Avancerad energikonfiguration'"
+            "metering_selection_required": "Ange antingen en smart elmätare eller välj 'Avancerad energikonfiguration'"
         },
         "step": {
             "user": {
@@ -13,7 +13,7 @@
                     "fuse_size": "Säkringsstorlek per fas (A)",
                     "phase_count": "Antal faser"
                 },
-                "description": "Ange detaljer för din laddare och mätare.",
+                "description": "Ange detaljer för din laddare och elmätare.",
                 "title": "Konfiguration"
             },
             "power": {
@@ -39,17 +39,17 @@
                     "max_fuse_load_amps": "Maximal säkringsbelastning (A)",
                     "enable_price_aware": "Aktivera smart elprisstyring"
                 },
-                "description": "Konfigurera grundläggande lastbalanseringsinställningar. Smart elprisstyring gör att systemet minskar laddningseffekten under dyra perioder för att spara pengar."
+                "description": "Konfigurera grundläggande lastbalanseringsinställningar. Smart elprisstyring gör att systemet automatiskt minskar laddningseffekten under dyra perioder för att spara pengar."
             },
             "price_aware": {
                 "title": "Inställningar för smart elprisstyring",
                 "data": {
                     "nord_pool_entity": "Nord Pool prissensor",
                     "price_threshold_percentile": "Tröskelvärde för lågt pris (%)",
-                    "price_upper_percentile": "Tröskelvärde för stoppning (%)",
-                    "high_price_charge_percentage": "Effekt vid medelpriser (%)"
+                    "price_upper_percentile": "Tröskelvärde för att stoppa laddning (%)",
+                    "high_price_charge_percentage": "Laddningseffekt vid medelpriser (%)"
                 },
-                "description": "Konfigurera hur systemet reagerar på elpriser. Låga priser = full laddning, medelpriser = reducerad effekt, mycket höga priser = ingen laddning."
+                "description": "Konfigurera hur systemet reagerar på elpriser från Nord Pool. Låga priser = full laddning, medelpriser = reducerad effekt, mycket höga priser = ingen laddning för maximal besparing."
             }
         },
         "error": {

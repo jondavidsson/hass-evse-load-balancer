@@ -83,11 +83,12 @@ class EVSELoadBalancerCoordinator:
 
         max_limits = dict.fromkeys(self._available_phases, self.fuse_size)
         
-        # Check if price-aware charging is enabled
-        price_aware_enabled = of.EvseLoadBalancerOptionsFlow.get_option_value(
-            self.config_entry, of.OPTION_ENABLE_PRICE_AWARE
+        # Start with the default balancer, which will be used as a fallback.
+        self._balancer_algo = OptimisedLoadBalancer(
+            max_limits=max_limits, hold_off_period=self.charge_limit_hysteresis
         )
-        
+
+        # If price-aware is enabled, try to overwrite with the price-aware balancer
         if price_aware_enabled:
             nord_pool_entity = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_NORD_POOL_ENTITY
@@ -101,30 +102,26 @@ class EVSELoadBalancerCoordinator:
             high_price_percentage = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_HIGH_PRICE_CHARGE_PERCENTAGE
             )
-            
-            # Ensure we have valid values and convert percentages to decimals
-            if price_threshold is None or price_upper is None or high_price_percentage is None:
-                _LOGGER.error("Price-aware configuration incomplete, falling back to standard load balancer")
-                self._balancer_algo = OptimisedLoadBalancer(max_limits=max_limits)
-                return
-                
-            price_threshold_decimal = price_threshold / 100.0
-            price_upper_decimal = price_upper / 100.0
-            high_price_decimal = high_price_percentage / 100.0
-            
-            self._balancer_algo = PriceAwareLoadBalancer(
-                hass=self.hass,
-                max_limits=max_limits,
-                nord_pool_entity_id=nord_pool_entity if nord_pool_entity else None,
-                price_threshold_percentile=price_threshold_decimal,
-                price_upper_percentile=price_upper_decimal,
-                high_price_charge_percentage=high_price_decimal,
+            high_price_disable_switch = of.EvseLoadBalancerOptionsFlow.get_option_value(
+                self.config_entry, of.OPTION_HIGH_PRICE_DISABLE_CHARGER_SWITCH
             )
-            await self._balancer_algo.async_setup()
-        else:
-            self._balancer_algo = OptimisedLoadBalancer(
-                max_limits=max_limits,
-            )
+
+            # Check for complete price-aware configuration
+            if all(v is not None for v in [nord_pool_entity, price_threshold, price_upper, high_price_percentage]):
+                _LOGGER.debug("Price-aware configuration is complete, setting up PriceAwareLoadBalancer.")
+                self._balancer_algo = PriceAwareLoadBalancer(
+                    hass=self.hass,
+                    max_limits=max_limits,
+                    hold_off_period=self.charge_limit_hysteresis,
+                    nord_pool_entity_id=nord_pool_entity,
+                    price_threshold_percentile=price_threshold,
+                    price_upper_percentile=price_upper,
+                    high_price_charge_percentage=high_price_percentage,
+                    high_price_disable_charger_switch=high_price_disable_switch,
+                )
+                await self._balancer_algo.async_setup()
+            else:
+                _LOGGER.warning("Price-aware charging is enabled but configuration is incomplete. Falling back to default balancer.")
 
         self._power_allocator = PowerAllocator()
         self._power_allocator.add_charger(charger=self._charger)

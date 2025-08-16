@@ -20,6 +20,7 @@ OPTION_NORD_POOL_ENTITY = "nord_pool_entity"
 OPTION_PRICE_THRESHOLD_PERCENTILE = "price_threshold_percentile"
 OPTION_PRICE_UPPER_PERCENTILE = "price_upper_percentile"
 OPTION_HIGH_PRICE_CHARGE_PERCENTAGE = "high_price_charge_percentage"
+OPTION_HIGH_PRICE_DISABLE_CHARGER_SWITCH = "high_price_disable_charger_switch"
 
 DEFAULT_VALUES: dict[str, Any] = {
     OPTION_CHARGE_LIMIT_HYSTERESIS: 15,
@@ -29,6 +30,7 @@ DEFAULT_VALUES: dict[str, Any] = {
     OPTION_PRICE_THRESHOLD_PERCENTILE: 30,
     OPTION_PRICE_UPPER_PERCENTILE: 80,
     OPTION_HIGH_PRICE_CHARGE_PERCENTAGE: 25,
+    OPTION_HIGH_PRICE_DISABLE_CHARGER_SWITCH: "",
 }
 
 
@@ -127,9 +129,9 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                     ),
                 ): NumberSelector(
                     {
-                        "min": 10,
-                        "max": 90,
-                        "step": 5,
+                        "min": 0,
+                        "max": 100,
+                        "step": 1,
                         "mode": "slider",
                         "unit_of_measurement": "%",
                     }
@@ -142,9 +144,9 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                     ),
                 ): NumberSelector(
                     {
-                        "min": 50,
-                        "max": 95,
-                        "step": 5,
+                        "min": 0,
+                        "max": 100,
+                        "step": 1,
                         "mode": "slider",
                         "unit_of_measurement": "%",
                     }
@@ -159,9 +161,20 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                     {
                         "min": 0,
                         "max": 100,
-                        "step": 5,
+                        "step": 1,
                         "mode": "slider",
                         "unit_of_measurement": "%",
+                    }
+                ),
+                vol.Optional(
+                    OPTION_HIGH_PRICE_DISABLE_CHARGER_SWITCH,
+                    default=options_values.get(
+                        OPTION_HIGH_PRICE_DISABLE_CHARGER_SWITCH,
+                        DEFAULT_VALUES[OPTION_HIGH_PRICE_DISABLE_CHARGER_SWITCH],
+                    ),
+                ): EntitySelector(
+                    {
+                        "domain": "switch",
                     }
                 ),
             }

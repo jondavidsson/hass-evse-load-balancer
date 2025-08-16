@@ -82,13 +82,20 @@ class EVSELoadBalancerCoordinator:
         )
 
         max_limits = dict.fromkeys(self._available_phases, self.fuse_size)
+
+        charge_limit_hysteresis = of.EvseLoadBalancerOptionsFlow.get_option_value(
+            self.config_entry, of.OPTION_CHARGE_LIMIT_HYSTERESIS
+        )
         
         # Start with the default balancer, which will be used as a fallback.
         self._balancer_algo = OptimisedLoadBalancer(
-            max_limits=max_limits, hold_off_period=self.charge_limit_hysteresis
+            max_limits=max_limits, hold_off_period=charge_limit_hysteresis
         )
 
         # If price-aware is enabled, try to overwrite with the price-aware balancer
+        price_aware_enabled = of.EvseLoadBalancerOptionsFlow.get_option_value(
+            self.config_entry, of.OPTION_ENABLE_PRICE_AWARE
+        )
         if price_aware_enabled:
             nord_pool_entity = of.EvseLoadBalancerOptionsFlow.get_option_value(
                 self.config_entry, of.OPTION_NORD_POOL_ENTITY
@@ -112,7 +119,7 @@ class EVSELoadBalancerCoordinator:
                 self._balancer_algo = PriceAwareLoadBalancer(
                     hass=self.hass,
                     max_limits=max_limits,
-                    hold_off_period=self.charge_limit_hysteresis,
+                    hold_off_period=charge_limit_hysteresis,
                     nord_pool_entity_id=nord_pool_entity,
                     price_threshold_percentile=price_threshold,
                     price_upper_percentile=price_upper,

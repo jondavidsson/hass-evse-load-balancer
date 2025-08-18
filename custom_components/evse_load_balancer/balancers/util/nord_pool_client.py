@@ -79,7 +79,7 @@ class NordPoolClient:
         """Get the current electricity price."""
         current_price, _ = self._get_current_and_all_prices()
         if current_price is not None:
-            _LOGGER.info("Nord Pool current price: %.3f", current_price)
+            _LOGGER.debug("Nord Pool current price: %.3f", current_price)
         return current_price
 
     def get_price_data(self) -> dict[str, Any]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from time import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..const import Phase
 from .optimised_load_balancer import OptimisedLoadBalancer
@@ -23,7 +23,7 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
         self,
         *,
         hass: HomeAssistant,
-        max_limits: dict[Phase, float],
+        max_limits: dict[Phase, int],
         min_charge_current: int = 6,  # Minimum current the charger supports
         hold_off_period: int = 30,
         price_hysteresis_period: int = 5,
@@ -151,7 +151,7 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
 
         return final_currents
 
-    def get_price_info(self) -> dict[str, any]:
+    def get_price_info(self) -> dict[str, Any]:
         """Get current price information for debugging/monitoring."""
         if not self._nord_pool_client:
             return {}

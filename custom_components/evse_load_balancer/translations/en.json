@@ -56,7 +56,8 @@
         "error": {
             "invalid_max_fuse_override": "Max fuse load override value is invalid.",
             "invalid_number_format": "A numeric value was expected.",
-            "nord_pool_entity_required": "A Nord Pool sensor must be selected when price-aware charging is enabled."
+            "nord_pool_entity_required": "A Nord Pool sensor must be selected when price-aware charging is enabled.",
+            "invalid_percentile_order": "The 'Stop Charging Threshold' must be higher than the 'Low Price Threshold'."
         },
         "abort": {
             "already_configured": "This device or service is already configured."

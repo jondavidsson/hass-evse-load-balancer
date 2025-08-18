@@ -217,6 +217,11 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
             # Validate that a Nord Pool entity is selected
             if not user_input.get(OPTION_NORD_POOL_ENTITY):
                 errors["base"] = "nord_pool_entity_required"
+            # Validate that the upper percentile is greater than or equal to the lower percentile
+            elif user_input.get(OPTION_PRICE_UPPER_PERCENTILE) < user_input.get(
+                OPTION_PRICE_THRESHOLD_PERCENTILE
+            ):
+                errors["base"] = "invalid_percentile_order"
             else:
                 # Combine basic options with price-aware options
                 combined_data = {**self._basic_options, **user_input}

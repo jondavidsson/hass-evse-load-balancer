@@ -56,7 +56,8 @@
         "error": {
             "invalid_max_fuse_override": "Ogiltigt värde för maximal säkringsåsidosättning.",
             "invalid_number_format": "Ett numeriskt värde förväntades.",
-            "nord_pool_entity_required": "En Nord Pool-sensor måste väljas när prisstyrd laddning är aktiverad."
+            "nord_pool_entity_required": "En Nord Pool-sensor måste väljas när prisstyrd laddning är aktiverad.",
+            "invalid_percentile_order": "'Tröskelvärde för att stoppa laddning' måste vara högre än 'Tröskelvärde för lågt pris'."
         },
         "abort": {
             "already_configured": "Denna enhet eller tjänst är redan konfigurerad."

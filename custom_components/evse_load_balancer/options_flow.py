@@ -214,18 +214,22 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
         """Handle the price-aware options step."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            # Combine basic options with price-aware options
-            combined_data = {**self._basic_options, **user_input}
-            
-            try:
-                input_data = await validate_init_input(self.hass, combined_data)
-            except ValidationExceptionError as ex:
-                errors[ex.base] = ex.key
-            except ValueError:
-                errors["base"] = "invalid_number_format"
+            # Validate that a Nord Pool entity is selected
+            if not user_input.get(OPTION_NORD_POOL_ENTITY):
+                errors["base"] = "nord_pool_entity_required"
+            else:
+                # Combine basic options with price-aware options
+                combined_data = {**self._basic_options, **user_input}
+                
+                try:
+                    input_data = await validate_init_input(self.hass, combined_data)
+                except ValidationExceptionError as ex:
+                    errors[ex.base] = ex.key
+                except ValueError:
+                    errors["base"] = "invalid_number_format"
 
-            if not errors:
-                return self.async_create_entry(title="", data=input_data)
+                if not errors:
+                    return self.async_create_entry(title="", data=input_data)
 
         return self.async_show_form(
             step_id="price_aware", data_schema=self._price_aware_options_schema(), errors=errors

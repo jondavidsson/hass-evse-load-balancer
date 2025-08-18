@@ -47,7 +47,8 @@
                     "nord_pool_entity": "Nord Pool prissensor",
                     "price_threshold_percentile": "Tröskelvärde för lågt pris (%)",
                     "price_upper_percentile": "Tröskelvärde för att stoppa laddning (%)",
-                    "high_price_charge_percentage": "Laddningseffekt vid medelpriser (%)"
+                    "high_price_charge_percentage": "Laddningseffekt vid medelpriser (%)",
+                    "high_price_disable_charger_switch": "Inaktivera laddaren med switch"
                 },
                 "description": "Konfigurera hur systemet reagerar på elpriser från Nord Pool. Låga priser = full laddning, medelpriser = reducerad effekt, mycket höga priser = ingen laddning för maximal besparing."
             }

@@ -47,7 +47,8 @@
                     "nord_pool_entity": "Nord Pool Price Sensor",
                     "price_threshold_percentile": "Low Price Threshold (%)",
                     "price_upper_percentile": "Stop Charging Threshold (%)",
-                    "high_price_charge_percentage": "Power During Medium Prices (%)"
+                    "high_price_charge_percentage": "Power During Medium Prices (%)",
+                    "high_price_disable_charger_switch": "Disable Charger with Switch"
                 },
                 "description": "Configure how the system responds to electricity prices. Low prices = full charging, medium prices = reduced power, very high prices = no charging."
             }

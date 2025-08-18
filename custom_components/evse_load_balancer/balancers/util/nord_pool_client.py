@@ -34,138 +34,146 @@ class NordPoolClient:
 
     async def async_setup(self) -> None:
         """Set up the Nord Pool client."""
-        # Verify that the Nord Pool entity exists
         entity_registry = er.async_get(self.hass)
-        entity = entity_registry.async_get(self.nord_pool_entity_id)
-        
-        if entity is None:
+        if entity_registry.async_get(self.nord_pool_entity_id) is None:
             _LOGGER.error(
                 "Nord Pool entity '%s' not found in entity registry",
-                self.nord_pool_entity_id
+                self.nord_pool_entity_id,
             )
             return False
-            
-        _LOGGER.debug("Nord Pool client setup complete for entity: %s", self.nord_pool_entity_id)
+
+        _LOGGER.debug(
+            "Nord Pool client setup complete for entity: %s", self.nord_pool_entity_id
+        )
         return True
+
+    def _get_current_and_all_prices(self) -> tuple[float | None, list[float]]:
+        """
+        Get the current price and a list of all available prices (today and tomorrow).
+
+        Returns:
+            A tuple containing the current price (or None) and a list of prices.
+        """
+        state = self.hass.states.get(self.nord_pool_entity_id)
+        if state is None or state.state in ("unavailable", "unknown"):
+            _LOGGER.warning("Nord Pool entity state unavailable: %s", self.nord_pool_entity_id)
+            return None, []
+
+        try:
+            current_price = float(state.state)
+        except (ValueError, TypeError):
+            _LOGGER.warning("Could not parse current Nord Pool price: %s", state.state)
+            return None, []
+
+        price_data = state.attributes
+        today_prices = price_data.get("today", [])
+        tomorrow_prices = price_data.get("tomorrow", [])
+
+        all_prices = [p for p in today_prices if p is not None]
+        if price_data.get("tomorrow_valid", False):
+            all_prices.extend([p for p in tomorrow_prices if p is not None])
+
+        return current_price, all_prices
 
     def get_current_price(self) -> float | None:
         """Get the current electricity price."""
-        state = self.hass.states.get(self.nord_pool_entity_id)
-        if state is None or state.state in ("unavailable", "unknown"):
-            _LOGGER.warning("Nord Pool entity state unavailable")
-            return None
-            
-        try:
-            current_price = float(state.state)
-            _LOGGER.info(
-                "Nord Pool current price: %.3f %s", 
-                current_price, 
-                state.attributes.get("unit_of_measurement", "")
-            )
-            return current_price
-        except (ValueError, TypeError):
-            _LOGGER.warning("Could not parse Nord Pool price: %s", state.state)
-            return None
+        current_price, _ = self._get_current_and_all_prices()
+        if current_price is not None:
+            _LOGGER.info("Nord Pool current price: %.3f", current_price)
+        return current_price
 
     def get_price_data(self) -> dict[str, Any]:
         """Get detailed price data including today's and tomorrow's prices."""
         state = self.hass.states.get(self.nord_pool_entity_id)
-        if state is None:
-            return {}
-        
-        price_data = state.attributes
-        
-        # Log price data summary
-        today_prices = price_data.get("today", [])
-        tomorrow_prices = price_data.get("tomorrow", [])
-        
-        if today_prices:
-            valid_today = [p for p in today_prices if p is not None]
-            if valid_today:
-                _LOGGER.info(
-                    "Nord Pool today's prices: %d values, min=%.3f, max=%.3f, avg=%.3f",
-                    len(valid_today),
-                    min(valid_today),
-                    max(valid_today),
-                    sum(valid_today) / len(valid_today)
-                )
-        
-        if tomorrow_prices:
-            valid_tomorrow = [p for p in tomorrow_prices if p is not None]
-            if valid_tomorrow:
-                _LOGGER.info(
-                    "Nord Pool tomorrow's prices: %d values, min=%.3f, max=%.3f, avg=%.3f",
-                    len(valid_tomorrow),
-                    min(valid_tomorrow),
-                    max(valid_tomorrow),
-                    sum(valid_tomorrow) / len(valid_tomorrow)
-                )
-        
-        return price_data
+        return state.attributes if state else {}
 
     def is_low_price_period(self, threshold_percentile: float = 0.3) -> bool | None:
         """
-        Check if current period is in the low price range.
-        
+        Check if the current period is in the low price range.
+
+        - Always returns True if the current price is <= 0.
+        - Otherwise, compares the current price to the percentile of today's and tomorrow's prices.
+
         Args:
             threshold_percentile: Percentile threshold (0.3 = bottom 30%)
-            
+
         Returns:
-            True if in low price period, False if high, None if no data
+            True if in low price period, False if not, None if data is unavailable.
         """
-        price_data = self.get_price_data()
-        current_price = self.get_current_price()
-        
-        if current_price is None or not price_data:
+        current_price, all_prices = self._get_current_and_all_prices()
+
+        if current_price is None:
             return None
-            
-        # Get today's prices
-        today_prices = price_data.get("today", [])
-        if not today_prices:
+
+        # Always consider charging if the price is zero or negative
+        if current_price <= 0:
+            _LOGGER.debug("Current price is <= 0, considering it a low-price period.")
+            return True
+
+        if not all_prices:
+            _LOGGER.warning("No price data available to calculate percentile.")
             return None
-            
-        # Calculate threshold price using provided percentile
-        sorted_prices = sorted([p for p in today_prices if p is not None])
-        if not sorted_prices:
-            return None
-            
+
+        sorted_prices = sorted(all_prices)
         threshold_index = int(len(sorted_prices) * threshold_percentile)
-        threshold_price = sorted_prices[threshold_index]
         
-        return current_price <= threshold_price
+        # Clamp index to be within bounds
+        if threshold_index >= len(sorted_prices):
+            threshold_index = len(sorted_prices) - 1
+            
+        threshold_price = sorted_prices[threshold_index]
+        is_low = current_price <= threshold_price
+        
+        _LOGGER.debug(
+            "Low price check: current=%.3f, threshold=%.3f (percentile=%.0f%%) -> %s",
+            current_price,
+            threshold_price,
+            threshold_percentile * 100,
+            is_low,
+        )
+        return is_low
 
     def is_high_price_period(self, threshold_percentile: float = 0.8) -> bool:
         """
-        Check if current price is in a high price period (above percentile threshold).
-        
+        Check if the current price is in a high price period.
+
+        - Never considers prices <= 0 as high.
+        - Compares the current price to the percentile of today's and tomorrow's prices.
+
         Args:
             threshold_percentile: Percentile threshold (0.8 = above 80th percentile)
-            
+
         Returns:
-            True if current price is above the threshold percentile
+            True if the current price is above the threshold, False otherwise.
         """
-        current_price = self.get_current_price()
-        if current_price is None:
+        current_price, all_prices = self._get_current_and_all_prices()
+
+        if current_price is None or not all_prices:
+            _LOGGER.warning("No price data available to calculate high price period.")
             return False
-            
-        price_data = self.get_price_data()
-        if not price_data:
+
+        # Negative prices should not be considered high
+        if current_price <= 0:
             return False
-            
-        # Get today's prices
-        today_prices = price_data.get("today", [])
-        if not today_prices:
-            return False
-            
-        # Calculate threshold price using provided percentile
-        sorted_prices = sorted([p for p in today_prices if p is not None])
-        if not sorted_prices:
-            return False
-            
+
+        sorted_prices = sorted(all_prices)
         threshold_index = int(len(sorted_prices) * threshold_percentile)
+
+        # Clamp index to be within bounds
+        if threshold_index >= len(sorted_prices):
+            threshold_index = len(sorted_prices) - 1
+
         threshold_price = sorted_prices[threshold_index]
-        
-        return current_price > threshold_price
+        is_high = current_price > threshold_price
+
+        _LOGGER.debug(
+            "High price check: current=%.3f, threshold=%.3f (percentile=%.0f%%) -> %s",
+            current_price,
+            threshold_price,
+            threshold_percentile * 100,
+            is_high,
+        )
+        return is_high
 
     def find_cheapest_period(self, duration_hours: int = 4) -> list[datetime] | None:
         """
@@ -179,28 +187,24 @@ class NordPoolClient:
         """
         price_data = self.get_price_data()
         
-        # Combine today and tomorrow prices if available
         today_prices = price_data.get("today", [])
         tomorrow_prices = price_data.get("tomorrow", [])
         
         if not today_prices:
             return None
             
-        # Create list of (price, datetime) tuples
         now = dt_util.now()
         current_hour = now.replace(minute=0, second=0, microsecond=0)
         
         all_prices = []
         
-        # Add today's remaining prices
         for i, price in enumerate(today_prices):
             if price is not None:
                 price_time = current_hour.replace(hour=i)
-                if price_time >= now:  # Only future prices
+                if price_time >= now:
                     all_prices.append({"value": price, "start": price_time.isoformat()})
         
-        # Add tomorrow's prices if available
-        if tomorrow_prices:
+        if price_data.get("tomorrow_valid", False) and tomorrow_prices:
             tomorrow_start = current_hour + timedelta(days=1)
             for i, price in enumerate(tomorrow_prices):
                 if price is not None:
@@ -211,19 +215,20 @@ class NordPoolClient:
             _LOGGER.warning("Not enough price data for %d hour period", duration_hours)
             return None
         
-        # Find cheapest consecutive period
         best_avg_price = float('inf')
-        best_start_idx = 0
+        best_start_idx = -1
         
         for i in range(len(all_prices) - duration_hours + 1):
-            period_prices = all_prices[i:i + duration_hours]
-            avg_price = sum(p["value"] for p in period_prices) / duration_hours
+            period_prices = [p["value"] for p in all_prices[i:i + duration_hours]]
+            avg_price = sum(period_prices) / duration_hours
             
             if avg_price < best_avg_price:
                 best_avg_price = avg_price
                 best_start_idx = i
         
-        # Return the datetime objects for the best period
+        if best_start_idx == -1:
+            return None
+
         best_period = all_prices[best_start_idx:best_start_idx + duration_hours]
         return [dt_util.parse_datetime(p["start"]) for p in best_period]
 
@@ -238,7 +243,6 @@ class NordPoolClient:
         Returns:
             True if should charge now, False otherwise
         """
-        # Simple logic: charge if in low price period
         is_low_price = self.is_low_price_period(threshold_percentile)
         current_price = self.get_current_price()
         

@@ -24,6 +24,7 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
         *,
         hass: HomeAssistant,
         max_limits: dict[Phase, float],
+        min_charge_current: int = 6,  # Minimum current the charger supports
         hold_off_period: int = 30,
         price_hysteresis_period: int = 5,
         nord_pool_entity_id: str | None = None,
@@ -38,6 +39,7 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
         Args:
             hass: Home Assistant instance
             max_limits: Maximum current limits per phase
+            min_charge_current: The minimum current the charger supports (Amperes)
             hold_off_period: Period between updates before returning new value (seconds)
             price_hysteresis_period: Hysteresis period for price changes (minutes)
             nord_pool_entity_id: Entity ID of the Nord Pool sensor (optional)
@@ -49,6 +51,7 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
         super().__init__(max_limits=max_limits, hold_off_period=hold_off_period)
         self._hass = hass
         self._max_limits = max_limits  # Store max limits (fuse size per phase)
+        self._min_charge_current = min_charge_current
         self._price_hysteresis_period = price_hysteresis_period * 60  # Convert to seconds
         self._price_threshold_percentile = price_threshold_percentile
         self._price_upper_percentile = price_upper_percentile
@@ -87,16 +90,29 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
             # No Nord Pool integration - use parent logic
             return super().compute_availability(available_currents, now)
         
-        is_low_price = self._nord_pool_client.is_low_price_period(self._price_threshold_percentile / 100.0)
-        is_very_high_price = self._nord_pool_client.is_high_price_period(self._price_upper_percentile / 100.0)
+        is_low_price = self._nord_pool_client.is_low_price_period(
+            self._price_threshold_percentile / 100.0
+        )
         
+        # When prices are low, ensure the charger switch is on if we control it
         if is_low_price:
-            # Low prices: Use normal OptimisedLoadBalancer logic
+            if self._high_price_disable_charger_switch and self._is_charger_disabled_by_price:
+                _LOGGER.debug(
+                    f"PriceAware: Price is low, ensuring switch {self._high_price_disable_charger_switch} is on"
+                )
+                self._hass.services.async_call(
+                    "switch", "turn_on", {"entity_id": self._high_price_disable_charger_switch}, blocking=False
+                )
+                self._is_charger_disabled_by_price = False
+            
             _LOGGER.debug("PriceAware: Low prices - using optimised balancer logic")
             return super().compute_availability(available_currents, now)
         
         # Medium or high prices: Apply price-based limits directly
         price_limited_currents = {}
+        is_very_high_price = self._nord_pool_client.is_high_price_period(
+            self._price_upper_percentile / 100.0
+        )
         
         for phase in available_currents:
             original_max = self._max_limits[phase]
@@ -113,28 +129,42 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
                     f"({self._high_price_charge_percentage}%)"
                 )
 
-            # Ensure the new limit is not below the charger's operational threshold (e.g., 6A)
+            # Ensure the new limit is not below the charger's operational threshold.
             # If it is, it should be set to 0 to pause charging.
-            if 0 < new_limit < 6:
+            if 0 < new_limit < self._min_charge_current:
                 _LOGGER.debug(
-                    f"PriceAware: Calculated limit {new_limit:.1f}A is below 6A, pausing."
+                    f"PriceAware: Calculated limit {new_limit:.1f}A is below minimum "
+                    f"of {self._min_charge_current}A, pausing."
                 )
                 new_limit = 0
 
             price_limited_currents[phase] = int(new_limit)
 
-        # Handle charger switch state based on price
+        # Determine if the charger should be paused (all phase currents are zero)
+        is_paused = all(current == 0 for current in price_limited_currents.values())
+
+        # Handle charger switch state based on the paused state
         if self._high_price_disable_charger_switch:
-            if is_very_high_price and not self._is_charger_disabled_by_price:
-                _LOGGER.debug(f"PriceAware: High price detected, turning off switch {self._high_price_disable_charger_switch}")
+            if is_paused and not self._is_charger_disabled_by_price:
+                _LOGGER.debug(
+                    f"PriceAware: Charger is paused, turning off switch {self._high_price_disable_charger_switch}"
+                )
                 self._hass.services.async_call(
-                    "switch", "turn_off", {"entity_id": self._high_price_disable_charger_switch}, blocking=False
+                    "switch",
+                    "turn_off",
+                    {"entity_id": self._high_price_disable_charger_switch},
+                    blocking=False,
                 )
                 self._is_charger_disabled_by_price = True
-            elif not is_very_high_price and self._is_charger_disabled_by_price:
-                _LOGGER.debug(f"PriceAware: Price no longer high, turning on switch {self._high_price_disable_charger_switch}")
+            elif not is_paused and self._is_charger_disabled_by_price:
+                _LOGGER.debug(
+                    f"PriceAware: Charger is resuming, turning on switch {self._high_price_disable_charger_switch}"
+                )
                 self._hass.services.async_call(
-                    "switch", "turn_on", {"entity_id": self._high_price_disable_charger_switch}, blocking=False
+                    "switch",
+                    "turn_on",
+                    {"entity_id": self._high_price_disable_charger_switch},
+                    blocking=False,
                 )
                 self._is_charger_disabled_by_price = False
 
@@ -147,8 +177,12 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
             
         return {
             "current_price": self._nord_pool_client.get_current_price(),
-            "is_low_price": self._nord_pool_client.is_low_price_period(self._price_threshold_percentile / 100.0),
-            "is_very_high_price": self._nord_pool_client.is_high_price_period(self._price_upper_percentile / 100.0),
+            "is_low_price": self._nord_pool_client.is_low_price_period(
+                self._price_threshold_percentile / 100.0
+            ),
+            "is_very_high_price": self._nord_pool_client.is_high_price_period(
+                self._price_upper_percentile / 100.0
+            ),
             "price_threshold_percentile": self._price_threshold_percentile,
             "price_upper_percentile": self._price_upper_percentile,
             "high_price_charge_percentage": self._high_price_charge_percentage,
@@ -159,5 +193,8 @@ class PriceAwareLoadBalancer(OptimisedLoadBalancer):
         if not self._nord_pool_client:
             return False
         
-        is_low_price = self._nord_pool_client.is_low_price_period(self._price_threshold_percentile / 100.0)
-        return not is_low_price  # Active during medium and high price periods
+        is_low_price = self._nord_pool_client.is_low_price_period(
+            self._price_threshold_percentile / 100.0
+        )
+        # Active during medium and high price periods
+        return not is_low_price

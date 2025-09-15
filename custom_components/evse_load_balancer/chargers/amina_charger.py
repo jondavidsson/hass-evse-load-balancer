@@ -27,7 +27,7 @@ class AminaPropertyMap(StrEnum):
     @see https://www.zigbee2mqtt.io/devices/amina_S.html
     """
 
-    ChargeLimit = "charge_limit"
+    ChargeLimit = "charge_limit_with_on_off"
     SinglePhase = "single_phase"
     EvConnected = "ev_connected"
     EvStatus = "ev_status"

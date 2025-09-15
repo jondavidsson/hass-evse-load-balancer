@@ -171,7 +171,7 @@ async def test_set_current_limit(amina_charger):
         await amina_charger.set_current_limit({Phase.L1: 20, Phase.L2: 18, Phase.L3: 15})
         mock_publish.assert_awaited_once_with(
             topic=amina_charger._topic_set,
-            payload={AminaPropertyMap.ChargeLimit: 15}
+            payload={"charge_limit_with_on_off": 20}
         )
 
 
@@ -187,3 +187,19 @@ async def test_async_unload(amina_charger):
     with patch.object(amina_charger, "async_unload_mqtt", new=AsyncMock()) as mock_unload:
         await amina_charger.async_unload()
         mock_unload.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_set_current_limit_below_min(amina_charger):
+    with patch.object(amina_charger, "_async_mqtt_publish", new=AsyncMock()) as mock_publish:
+        await amina_charger.set_current_limit({Phase.L1: 5, Phase.L2: 4, Phase.L3: 3})
+        mock_publish.assert_awaited_once_with(
+            topic=amina_charger._topic_set,
+            payload={"charge_limit_with_on_off": 0}
+        )
+
+def test_can_charge_true_zero_limit(amina_charger):
+    amina_charger._state_cache[AminaPropertyMap.EvConnected] = True
+    amina_charger._state_cache[AminaPropertyMap.ChargeLimit] = 0
+    amina_charger._state_cache[AminaPropertyMap.EvStatus] = "EV Connected" # Or any status
+    assert amina_charger.can_charge() is True

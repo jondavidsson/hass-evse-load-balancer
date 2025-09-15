@@ -27,7 +27,7 @@ class AminaPropertyMap(StrEnum):
     @see https://www.zigbee2mqtt.io/devices/amina_S.html
     """
 
-    ChargeLimit = "charge_limit_with_on_off"
+    ChargeLimit = "charge_limit"
     SinglePhase = "single_phase"
     EvConnected = "ev_connected"
     EvStatus = "ev_status"
@@ -35,10 +35,10 @@ class AminaPropertyMap(StrEnum):
 
     def gettable() -> set[Self]:
         """Define properties that can be fetched via a /get request."""
-        return (
+        return {
             AminaPropertyMap.ChargeLimit,
             AminaPropertyMap.SinglePhase,
-        )
+        }
 
 
 @unique
@@ -116,7 +116,7 @@ class AminaCharger(Zigbee2Mqtt, Charger):
             current_value = min(requested_current, AMINA_HW_MAX_CURRENT)
             
         await self._async_mqtt_publish(
-            topic=self._topic_set, payload={AminaPropertyMap.ChargeLimit: current_value}
+            topic=self._topic_set, payload={"charge_limit_with_on_off": current_value}
         )
 
     def get_current_limit(self) -> dict[Phase, int] | None:
@@ -149,6 +149,11 @@ class AminaCharger(Zigbee2Mqtt, Charger):
         ev_status = str(
             self._state_cache.get(AminaPropertyMap.EvStatus, "unknown")
         ).lower()
+
+        # If the charger is explicitly set to 0A, it's considered "off" but still capable of charging
+        current_limit = self._state_cache.get(AminaPropertyMap.ChargeLimit)
+        if current_limit is not None and int(current_limit) == 0:
+            return True
 
         return ev_status in (
             AminaStatusMap.Charging,

@@ -169,10 +169,19 @@ async def test_set_phase_mode_three(amina_charger):
 async def test_set_current_limit(amina_charger):
     with patch.object(amina_charger, "_async_mqtt_publish", new=AsyncMock()) as mock_publish:
         await amina_charger.set_current_limit({Phase.L1: 20, Phase.L2: 18, Phase.L3: 15})
-        mock_publish.assert_awaited_once_with(
-            topic=amina_charger._topic_set,
-            payload={"charge_limit_with_on_off": 20}
-        )
+        
+        # Check that _async_mqtt_publish was called twice
+        assert mock_publish.call_count == 2
+        
+        # Check the arguments of the first call (ChargeLimit)
+        call1_args, call1_kwargs = mock_publish.call_args_list[0]
+        assert call1_kwargs["topic"] == amina_charger._topic_set
+        assert call1_kwargs["payload"] == {AminaPropertyMap.ChargeLimit: 20}
+        
+        # Check the arguments of the second call (State)
+        call2_args, call2_kwargs = mock_publish.call_args_list[1]
+        assert call2_kwargs["topic"] == amina_charger._topic_set
+        assert call2_kwargs["payload"] == {AminaPropertyMap.State: "ON"}
 
 
 @pytest.mark.asyncio
@@ -193,10 +202,19 @@ async def test_async_unload(amina_charger):
 async def test_set_current_limit_below_min(amina_charger):
     with patch.object(amina_charger, "_async_mqtt_publish", new=AsyncMock()) as mock_publish:
         await amina_charger.set_current_limit({Phase.L1: 5, Phase.L2: 4, Phase.L3: 3})
-        mock_publish.assert_awaited_once_with(
-            topic=amina_charger._topic_set,
-            payload={"charge_limit_with_on_off": 0}
-        )
+        
+        # Check that _async_mqtt_publish was called twice
+        assert mock_publish.call_count == 2
+        
+        # Check the arguments of the first call (ChargeLimit)
+        call1_args, call1_kwargs = mock_publish.call_args_list[0]
+        assert call1_kwargs["topic"] == amina_charger._topic_set
+        assert call1_kwargs["payload"] == {AminaPropertyMap.ChargeLimit: 0}
+        
+        # Check the arguments of the second call (State)
+        call2_args, call2_kwargs = mock_publish.call_args_list[1]
+        assert call2_kwargs["topic"] == amina_charger._topic_set
+        assert call2_kwargs["payload"] == {AminaPropertyMap.State: "OFF"}
 
 def test_can_charge_true_zero_limit(amina_charger):
     amina_charger._state_cache[AminaPropertyMap.EvConnected] = True

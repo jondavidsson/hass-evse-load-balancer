@@ -22,7 +22,7 @@ from .util.zigbee2mqtt import (
 @unique
 class AminaPropertyMap(StrEnum):
     """
-    Map Easee properties.
+    Map Amina S properties.
 
     @see https://www.zigbee2mqtt.io/devices/amina_S.html
     """
@@ -32,7 +32,9 @@ class AminaPropertyMap(StrEnum):
     EvConnected = "ev_connected"
     EvStatus = "ev_status"
     Charging = "charging"
+    State = "state"
 
+    @staticmethod
     def gettable() -> set[Self]:
         """Define properties that can be fetched via a /get request."""
         return {
@@ -79,7 +81,7 @@ class AminaCharger(Zigbee2Mqtt, Charger):
 
     @staticmethod
     def is_charger_device(device: DeviceEntry) -> bool:
-        """Check if the given device is an Easee charger."""
+        """Check if the given device is an Amina S charger."""
         return any(
             (
                 id_domain == HA_INTEGRATION_DOMAIN_MQTT
@@ -109,14 +111,24 @@ class AminaCharger(Zigbee2Mqtt, Charger):
         """Set the charger limit."""
         requested_current = max(limit.values()) if limit.values() else 0
         
-        # Hardware validation: below min current = stop charging (0A)
-        if 0 < requested_current < AMINA_HW_MIN_CURRENT:
+        # Determine the state (ON/OFF) and current value to send
+        if requested_current < AMINA_HW_MIN_CURRENT:
+            # If requested current is below min, set current to 0 and turn off
             current_value = 0
+            state_value = "OFF"
         else:
+            # Otherwise, set current to requested and turn on
             current_value = min(requested_current, AMINA_HW_MAX_CURRENT)
+            state_value = "ON"
             
+        # Publish the charge limit
         await self._async_mqtt_publish(
-            topic=self._topic_set, payload={"charge_limit_with_on_off": current_value}
+            topic=self._topic_set, payload={AminaPropertyMap.ChargeLimit: current_value}
+        )
+        
+        # Publish the state (ON/OFF)
+        await self._async_mqtt_publish(
+            topic=self._topic_set, payload={AminaPropertyMap.State: state_value}
         )
 
     def get_current_limit(self) -> dict[Phase, int] | None:

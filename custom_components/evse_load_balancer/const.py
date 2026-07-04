@@ -15,8 +15,16 @@ CHARGER_MANUFACTURER_AMINA = "Amina Distribution AS"
 
 METER_DOMAIN_DSMR = "dsmr"
 METER_DOMAIN_HOMEWIZARD = "homewizard"
+METER_MANUFACTURER_AMSLESER = "amsleser.no"
+METER_DOMAIN_TIBBER = "tibber"
 
-SUPPORTED_METER_DEVICE_DOMAINS = (METER_DOMAIN_DSMR, METER_DOMAIN_HOMEWIZARD)
+SUPPORTED_METER_DEVICES = (
+    (METER_DOMAIN_DSMR, None),
+    (METER_DOMAIN_HOMEWIZARD, None),
+    (METER_DOMAIN_TIBBER, None),
+    (HA_INTEGRATION_DOMAIN_MQTT, METER_MANUFACTURER_AMSLESER),
+)
+SUPPORTED_METER_DEVICE_DOMAINS = [domain for (domain, _) in SUPPORTED_METER_DEVICES]
 
 
 COORDINATOR_STATE_AWAITING_CHARGER = "awaiting_charger"
@@ -39,3 +47,10 @@ class Phase(Enum):
     L1 = "l1"
     L2 = "l2"
     L3 = "l3"
+
+
+class OvercurrentMode(Enum):
+    """Enum for overcurrent handling modes."""
+
+    CONSERVATIVE = "conservative"
+    OPTIMISED = "optimised"

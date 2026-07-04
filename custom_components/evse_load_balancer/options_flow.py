@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow
-from homeassistant.helpers.selector import NumberSelector
+from homeassistant.helpers.selector import BooleanSelector, NumberSelector
 
 from . import config_flow as cf
 from .exceptions.validation_exception import ValidationExceptionError
@@ -16,8 +16,12 @@ if TYPE_CHECKING:
 
 OPTION_CHARGE_LIMIT_HYSTERESIS = "charge_limit_hysteresis"
 OPTION_MAX_FUSE_LOAD_AMPS = "max_fuse_load_amps"
+OPTION_ALLOW_TEMPORARY_OVERCURRENT = "allow_temporary_overcurrent"
 
-DEFAULT_VALUES: dict[str, Any] = {OPTION_CHARGE_LIMIT_HYSTERESIS: 15}
+DEFAULT_VALUES: dict[str, Any] = {
+    OPTION_CHARGE_LIMIT_HYSTERESIS: 15,
+    OPTION_ALLOW_TEMPORARY_OVERCURRENT: True,
+}
 
 
 async def validate_init_input(
@@ -31,14 +35,8 @@ async def validate_init_input(
 class EvseLoadBalancerOptionsFlow(OptionsFlow):
     """Handle an options flow for evse-load-balancer."""
 
-    def __init__(self, config_entry: ConfigEntry | None = None) -> None:
-        """
-        Initialize options flow.
-
-        @see https://developers.home-assistant.io/blog/2024/11/12/options-flow/
-        """
-        if config_entry is not None:
-            self.config_entry = config_entry
+    # No custom __init__ needed - config_entry is set by the framework
+    # @see https://developers.home-assistant.io/blog/2024/11/12/options-flow/
 
     @staticmethod
     def get_option_value(config_entry: ConfigEntry, key: str) -> Any:
@@ -81,6 +79,13 @@ class EvseLoadBalancerOptionsFlow(OptionsFlow):
                         "unit_of_measurement": "A",
                     }
                 ),
+                vol.Optional(
+                    OPTION_ALLOW_TEMPORARY_OVERCURRENT,
+                    default=options_values.get(
+                        OPTION_ALLOW_TEMPORARY_OVERCURRENT,
+                        DEFAULT_VALUES[OPTION_ALLOW_TEMPORARY_OVERCURRENT],
+                    ),
+                ): BooleanSelector(),
             }
         )
 

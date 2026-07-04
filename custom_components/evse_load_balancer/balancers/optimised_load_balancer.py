@@ -2,8 +2,9 @@
 
 from time import time
 
-from ..meters.meter import Phase  # noqa: TID252
-from .balancer import Balancer
+from custom_components.evse_load_balancer.balancers.balancer import Balancer
+from custom_components.evse_load_balancer.const import OvercurrentMode
+from custom_components.evse_load_balancer.meters.meter import Phase
 
 
 class OptimisedLoadBalancer(Balancer):
@@ -22,18 +23,18 @@ class OptimisedLoadBalancer(Balancer):
     def __init__(
         self,
         max_limits: dict[Phase, int],
-        hold_off_period: int = 30,  # Period between updates before returning new value
-        trip_risk_threshold: int = 60,  # Allowed risk before reducing the limit
-        risk_decay_per_second: float = 1.0,  # How quickly accumulated risk decays
+        trip_risk_threshold: int = 60,
+        risk_decay_per_second: float = 1.0,
+        overcurrent_mode: OvercurrentMode = OvercurrentMode.OPTIMISED,
     ) -> None:
         """Initialize the load balancer."""
         self._phase_monitors = {
             phase: PhaseMonitor(
                 phase=phase,
                 max_limit=max_limits[phase],
-                hold_off_period=hold_off_period,
                 trip_risk_threshold=trip_risk_threshold,
                 risk_decay_per_second=risk_decay_per_second,
+                overcurrent_mode=overcurrent_mode,
             )
             for phase in max_limits
         }
@@ -59,19 +60,18 @@ class PhaseMonitor:
         self,
         phase: Phase,
         max_limit: int,
-        hold_off_period: int = 30,
         trip_risk_threshold: int = 60,
         risk_decay_per_second: float = 1.0,
+        overcurrent_mode: OvercurrentMode = OvercurrentMode.OPTIMISED,
     ) -> None:
         """Monitor given phase current availability and return normalised limits."""
         self.phase = phase
         self.max_limit = max_limit
-        self.phase_limit = max_limit  # Initial limit is the maximum limit
-        self._hold_off_period = hold_off_period
+        self.phase_limit = max_limit
         self._trip_risk_threshold = trip_risk_threshold
         self._risk_decay_per_second = risk_decay_per_second
+        self._overcurrent_mode = overcurrent_mode
 
-        self.next_probe_time = 0
         self._last_compute: int | None = None
         self._cumulative_trip_risk = 0.0
 
@@ -79,25 +79,23 @@ class PhaseMonitor:
         """Update the current availability and compute the new limit."""
         elapsed = now - self._last_compute if self._last_compute is not None else 0
 
-        # Multiplicative decrease on overcurrent
         if avail < 0:
-            risk_increase = self._calculate_trip_risk(avail) * elapsed
-            self._cumulative_trip_risk += risk_increase
+            if self._overcurrent_mode == OvercurrentMode.OPTIMISED:
+                risk_increase = self._calculate_trip_risk(avail) * elapsed
+                self._cumulative_trip_risk += risk_increase
 
-            # If risk exceeds threshold, multiplicative reduction of power
-            if self._cumulative_trip_risk >= self._trip_risk_threshold:
+                if self._cumulative_trip_risk >= self._trip_risk_threshold:
+                    self._cumulative_trip_risk = 0.0
+                    self.phase_limit = avail
+            else:
                 self._cumulative_trip_risk = 0.0
-                self.phase_limit = avail
-                self.next_probe_time = now + self._hold_off_period
-        # Additive increase when line is stable and hold_off_period elapsed
+                self.phase_limit = max(0, self.phase_limit + avail)
         else:
             risk_decay = self._risk_decay_per_second * elapsed
             self._cumulative_trip_risk = max(
                 0.0, self._cumulative_trip_risk - risk_decay
             )
-            if now >= self.next_probe_time:
-                self.phase_limit = min(self.max_limit, avail)
-                self.next_probe_time = now + self._hold_off_period
+            self.phase_limit = min(self.max_limit, avail)
 
         self._last_compute = now
 

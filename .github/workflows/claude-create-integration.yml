@@ -1,0 +1,100 @@
+name: Claude Code
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'integration-request')
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements.txt
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Claude Code Bot"
+          git config --global user.email "claude-code-bot@users.noreply.github.com"
+
+      - name: Run Claude on Issues
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          prompt: |
+            NON-INTERACTIVE MODE: You cannot ask questions. Comment on issue and stop on any error.
+
+            TASK: Create integration from issue #${{ github.event.issue.number }}
+
+            1. READ ISSUE
+            Run: `gh issue view ${{ github.event.issue.number }} --json body --jq .body`
+            Extract from markdown sections: Integration Type, Device/Brand Name, HA GitHub Source
+
+            2. VALIDATE
+            If type, name, or GitHub source missing → comment "Missing: [fields]" → STOP
+
+            3. RUN SKILL
+            Convert to snake_case: "Home Wizard" → "homewizard"
+            `/create-integration <type> <snake_case_name> --github-source "<url>" --non-interactive`
+
+            4. CHECK OUTPUT
+            If STATUS: FAILED → comment with ERROR_MESSAGE → STOP
+            If STATUS: SUCCESS → continue
+
+            5. VALIDATE CODE
+            `ruff check custom_components/ && pytest tests/<type>s/test_<name>_<type>.py -v`
+            If fails → fix with `ruff check --fix` → retest
+            If still fails → comment failures → STOP
+
+            6. COMMIT & PUSH
+            ```bash
+            git checkout -b feature/<name>-<type>-${{ github.event.issue.number }}
+            git add .
+            git commit -m "Add <name> <type> integration
+
+            Resolves #${{ github.event.issue.number }}"
+            git push -u origin feature/<name>-<type>-${{ github.event.issue.number }}
+            ```
+
+            7. CREATE PR
+            ```bash
+            gh pr create --title "Add <name> <type> integration" \
+              --body "Resolves #${{ github.event.issue.number }}
+
+            Auto-generated skeleton. See skill output for inferred parameters.
+            Tests passed. Requires hardware validation." \
+              --label "<type>" --reviewer dirkgroenen
+            ```
+
+            8. REPORT
+            `gh issue comment ${{ github.event.issue.number }} -b "✅ PR created: #<pr_number>"`
+
+            CONSTRAINTS:
+            - Never use AskUserQuestion
+            - Always comment on issue before stopping
+            - Use gh CLI for GitHub operations
+
+          claude_args: "--allowedTools 'Skill,Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(pytest:*),Bash(ruff:*),Bash(gh:*),WebFetch,WebSearch'"

@@ -267,6 +267,29 @@ def test_charger_allocation(coordinator):
     })
 
 
+def test_manual_override_active_delegates_to_allocator(coordinator):
+    """Test that the property reads override state from the power allocator."""
+    coordinator._power_allocator.is_manual_override_active.return_value = True
+
+    assert coordinator.manual_override_active is True
+    coordinator._power_allocator.is_manual_override_active.assert_called_once_with(
+        coordinator._charger.id
+    )
+
+
+def test_set_manual_override_delegates_to_allocator(coordinator):
+    """Test that setting the override is forwarded to the power allocator."""
+    coordinator.set_manual_override(active=True)
+    coordinator._power_allocator.set_manual_override.assert_called_once_with(
+        coordinator._charger.id, active=True
+    )
+
+    coordinator.set_manual_override(active=False)
+    coordinator._power_allocator.set_manual_override.assert_called_with(
+        coordinator._charger.id, active=False
+    )
+
+
 def test_no_update_when_available_current_unknown(coordinator):
     """Test that no update happens when available current is unknown."""
     # Set meter to return None

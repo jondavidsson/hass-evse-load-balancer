@@ -71,6 +71,11 @@
             "evse_available_current_l3": {
                 "name": "Tillgänglig ström L3"
             }
+        },
+        "switch": {
+            "evse_manual_override": {
+                "name": "Manuell åsidosättning"
+            }
         }
     }
 }

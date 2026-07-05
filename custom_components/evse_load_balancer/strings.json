@@ -75,6 +75,11 @@
             "evse_available_current_l3": {
                 "name": "Available current L3"
             }
+        },
+        "switch": {
+            "evse_manual_override": {
+                "name": "Manual override"
+            }
         }
     }
 }

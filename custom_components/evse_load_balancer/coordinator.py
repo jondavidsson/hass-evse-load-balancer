@@ -197,6 +197,15 @@ class EVSELoadBalancerCoordinator:
         """Get the timestamp of the last check cycle."""
         return self._last_check_timestamp
 
+    @property
+    def manual_override_active(self) -> bool:
+        """Return whether a manual override is currently active."""
+        return self._power_allocator.is_manual_override_active(self._charger.id)
+
+    def set_manual_override(self, *, active: bool) -> None:
+        """Lock or release the manual override for the managed charger."""
+        self._power_allocator.set_manual_override(self._charger.id, active=active)
+
     @callback
     def _execute_update_cycle(self, now: datetime) -> None:
         """Execute the main update cycle for load balancing."""

@@ -21,6 +21,11 @@ class ChargerState:
         self.last_applied_current: dict[Phase, int] | None = None
         self.last_update_time: int = 0
         self.manual_override_detected: bool = False
+        # User-initiated lock via the manual override switch. Kept separate from
+        # manual_override_detected: that flag is auto-cleared by
+        # update_allocation() on any applied change (including safety cuts) and
+        # must keep its lifecycle. In-memory only, does not survive a HA restart.
+        self.manual_override_locked: bool = False
         self.initialized: bool = False
         self._active_session: bool = False
 
@@ -51,7 +56,12 @@ class ChargerState:
 
         is_charging = self.charger.can_charge()
 
-        if is_charging and not self._active_session:
+        # A deliberate user lock survives session changes; only the switch
+        # releases it.
+        if is_charging and not self._active_session and self.manual_override_locked:
+            self._active_session = True
+
+        elif is_charging and not self._active_session:
             max_limits = self.charger.get_max_current_limit()
             if max_limits:
                 self.requested_current = dict(max_limits)
@@ -81,6 +91,27 @@ class ChargerState:
 
         # Always set active_session
         self._active_session = is_charging
+
+    def set_manual_override(self, *, active: bool) -> None:
+        """
+        Manually lock or release the charger's requested capacity.
+
+        Locking freezes requested_current at the charger's current setting so
+        the balancer won't increase it; overcurrent cuts still apply. Releasing
+        restores requested_current to the charger's maximum, mirroring the
+        new-session reset in detect_manual_override().
+        """
+        if active:
+            current_setting = self.get_current_limit()
+            if current_setting:
+                self.requested_current = dict(current_setting)
+            self.manual_override_locked = True
+        else:
+            max_limits = self.charger.get_max_current_limit()
+            if max_limits:
+                self.requested_current = dict(max_limits)
+            self.manual_override_locked = False
+            self.manual_override_detected = False
 
     def get_current_limit(self) -> dict[Phase, int] | None:
         """Get the current limit of the charger."""
@@ -219,6 +250,26 @@ class PowerAllocator:
         _LOGGER.debug(
             "Updated applied current for charger %s: %s", charger_id, applied_current
         )
+
+    def set_manual_override(self, charger_id: str, *, active: bool) -> None:
+        """Lock or release the manual override for a specific charger."""
+        if charger_id not in self._chargers:
+            _LOGGER.warning("Charger %s not found in PowerAllocator", charger_id)
+            return
+
+        self._chargers[charger_id].set_manual_override(active=active)
+        _LOGGER.info(
+            "Manual override %s for charger %s",
+            "locked" if active else "released",
+            charger_id,
+        )
+
+    def is_manual_override_active(self, charger_id: str) -> bool:
+        """Return whether a manual override is currently active for a charger."""
+        state = self._chargers.get(charger_id)
+        if state is None:
+            return False
+        return state.manual_override_detected or state.manual_override_locked
 
     def _allocate_current(
         self, available_currents: dict[Phase, int]

@@ -283,6 +283,105 @@ def test_manual_override_detection_maintains_charger_reset_at_session_start(powe
     assert state.requested_current == dict.fromkeys(Phase, 16)
 
 
+def test_set_manual_override_locks_at_current_setting(power_allocator: PowerAllocator):
+    """Test locking freezes requested_current at the charger's current setting."""
+    charger = MockCharger(initial_current=16, max_current=32, charger_id="charger1")
+    charger.set_can_charge(True)
+    power_allocator.add_charger_and_initialize(charger)
+    charger.set_current_limits(dict.fromkeys(Phase, 10))
+
+    power_allocator.set_manual_override("charger1", active=True)
+
+    state = power_allocator._chargers["charger1"]
+    assert state.manual_override_locked is True
+    assert state.requested_current == dict.fromkeys(Phase, 10)
+    assert power_allocator.is_manual_override_active("charger1") is True
+
+
+def test_set_manual_override_release_restores_max(power_allocator: PowerAllocator):
+    """Test releasing the lock restores max capacity and clears both flags."""
+    charger = MockCharger(initial_current=10, max_current=32, charger_id="charger1")
+    charger.set_can_charge(True)
+    power_allocator.add_charger_and_initialize(charger)
+
+    state = power_allocator._chargers["charger1"]
+    power_allocator.set_manual_override("charger1", active=True)
+    state.manual_override_detected = True
+
+    power_allocator.set_manual_override("charger1", active=False)
+
+    assert state.manual_override_locked is False
+    assert state.manual_override_detected is False
+    assert state.requested_current == dict.fromkeys(Phase, 32)
+    assert power_allocator.is_manual_override_active("charger1") is False
+
+
+def test_set_manual_override_unknown_charger(power_allocator: PowerAllocator):
+    """Test that an unknown charger id is a no-op, not an error."""
+    power_allocator.set_manual_override("missing", active=True)
+
+    assert power_allocator.is_manual_override_active("missing") is False
+
+
+def test_is_manual_override_active_reports_detected_or_locked(
+    power_allocator: PowerAllocator,
+):
+    """Test that the active state reflects either the auto or user flag."""
+    charger = MockCharger(initial_current=10, charger_id="charger1")
+    power_allocator.add_charger_and_initialize(charger)
+    state = power_allocator._chargers["charger1"]
+
+    assert power_allocator.is_manual_override_active("charger1") is False
+
+    state.manual_override_detected = True
+    assert power_allocator.is_manual_override_active("charger1") is True
+
+    state.manual_override_detected = False
+    state.manual_override_locked = True
+    assert power_allocator.is_manual_override_active("charger1") is True
+
+
+def test_safety_cut_while_locked_keeps_lock(power_allocator: PowerAllocator):
+    """Test that an overcurrent cut does not release a user lock."""
+    charger = MockCharger(initial_current=10, charger_id="charger1")
+    charger.set_can_charge(True)
+    power_allocator.add_charger_and_initialize(charger)
+
+    power_allocator.set_manual_override("charger1", active=True)
+    state = power_allocator._chargers["charger1"]
+    state.manual_override_detected = True
+
+    result = power_allocator.update_allocation(dict.fromkeys(Phase, -4))
+
+    # The cut still fires while locked ...
+    assert result["charger1"] == dict.fromkeys(Phase, 6)
+    # ... and clears the auto flag, but the user lock survives
+    assert state.manual_override_detected is False
+    assert state.manual_override_locked is True
+    assert power_allocator.is_manual_override_active("charger1") is True
+    assert state.requested_current == dict.fromkeys(Phase, 10)
+
+
+def test_new_session_while_locked_keeps_requested_current(
+    power_allocator: PowerAllocator,
+):
+    """Test that a new charging session does not reset a locked charger to max."""
+    charger = MockCharger(initial_current=10, max_current=32, charger_id="charger1")
+    charger.set_can_charge(False)
+    power_allocator.add_charger_and_initialize(charger)
+
+    power_allocator.set_manual_override("charger1", active=True)
+    state = power_allocator._chargers["charger1"]
+    assert state._active_session is False
+
+    charger.set_can_charge(True)
+    state.detect_manual_override()
+
+    assert state._active_session is True
+    assert state.requested_current == dict.fromkeys(Phase, 10)
+    assert state.manual_override_locked is True
+
+
 def test_multiple_chargers_allocation(power_allocator: PowerAllocator):
     """Test allocating current to multiple chargers."""
     # Create two chargers

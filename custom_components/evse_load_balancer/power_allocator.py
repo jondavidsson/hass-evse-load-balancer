@@ -9,6 +9,13 @@ from .const import Phase
 
 _LOGGER = logging.getLogger(__name__)
 
+# Extra time beyond a charger's current_change_settle_time during which a
+# hardware-side clamp of our own commanded value (e.g. the charger's own
+# configured max being lower than what we requested) is accepted as the new
+# baseline instead of being flagged as a manual override. Comfortably exceeds
+# one coordinator cycle so a normal 1s-cadence check lands inside it.
+MANUAL_OVERRIDE_SETTLE_GRACE: int = 3
+
 
 class ChargerState:
     """Tracks internal allocation state for a single charger."""
@@ -71,13 +78,33 @@ class ChargerState:
                 for phase in current_setting
             )
         ):
-            self.requested_current = dict(current_setting)
-            self.last_applied_current = dict(current_setting)
-            self.manual_override_detected = True
-            _LOGGER.info(
-                "Manual override detected for charger. New requested current: %s",
-                current_setting,
+            elapsed = int(time()) - self.last_update_time
+            settle_time = self.charger.current_change_settle_time
+            freshly_settled = (
+                settle_time <= elapsed < settle_time + MANUAL_OVERRIDE_SETTLE_GRACE
             )
+
+            if freshly_settled:
+                # First real reading after our own command: the charger
+                # settled at a different (likely clamped, e.g. a lower
+                # hardware-configured max) level than requested. Accept it
+                # as the new baseline instead of flagging a manual override.
+                _LOGGER.debug(
+                    "Charger %s settled at %s instead of commanded %s; "
+                    "accepting as clamped, not a manual override",
+                    self.charger.id,
+                    current_setting,
+                    self.last_applied_current,
+                )
+                self.last_applied_current = dict(current_setting)
+            else:
+                self.requested_current = dict(current_setting)
+                self.last_applied_current = dict(current_setting)
+                self.manual_override_detected = True
+                _LOGGER.info(
+                    "Manual override detected for charger. New requested current: %s",
+                    current_setting,
+                )
 
         # Always set active_session
         self._active_session = is_charging

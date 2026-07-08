@@ -283,6 +283,72 @@ def test_manual_override_detection_maintains_charger_reset_at_session_start(powe
     assert state.requested_current == dict.fromkeys(Phase, 16)
 
 
+def test_manual_override_not_flagged_when_freshly_clamped(power_allocator: PowerAllocator):
+    """Test that a hardware clamp of our own command isn't flagged as an override."""
+    charger = MockCharger(initial_current=10, charger_id="charger1")
+    power_allocator.add_charger_and_initialize(charger)
+
+    # We commanded 25A ~16 seconds ago (just past the 15s settle time)
+    power_allocator.update_applied_current(
+        "charger1",
+        dict.fromkeys(Phase, 25),
+        timestamp=int(time() - 16),
+    )
+
+    # But the hardware only accepted 20A (e.g. its own configured max)
+    charger.set_current_limits(dict.fromkeys(Phase, 20))
+
+    state = power_allocator._chargers["charger1"]
+    state.detect_manual_override()
+
+    assert state.manual_override_detected is False
+    assert state.last_applied_current == dict.fromkeys(Phase, 20)
+
+
+def test_manual_override_still_detected_outside_grace_window(power_allocator: PowerAllocator):
+    """Test that a divergence well after the settle grace window is still flagged."""
+    charger = MockCharger(initial_current=10, charger_id="charger1")
+    power_allocator.add_charger_and_initialize(charger)
+
+    power_allocator.update_applied_current(
+        "charger1",
+        dict.fromkeys(Phase, 25),
+        timestamp=int(time() - 30),
+    )
+
+    charger.set_current_limits(dict.fromkeys(Phase, 20))
+
+    state = power_allocator._chargers["charger1"]
+    state.detect_manual_override()
+
+    assert state.manual_override_detected is True
+    assert state.requested_current == dict.fromkeys(Phase, 20)
+
+
+def test_manual_override_detected_for_change_after_clamp_accepted(power_allocator: PowerAllocator):
+    """Test a genuine override is still caught after an earlier clamp was accepted."""
+    charger = MockCharger(initial_current=10, charger_id="charger1")
+    power_allocator.add_charger_and_initialize(charger)
+
+    power_allocator.update_applied_current(
+        "charger1", dict.fromkeys(Phase, 25), timestamp=int(time() - 16)
+    )
+    charger.set_current_limits(dict.fromkeys(Phase, 20))
+
+    state = power_allocator._chargers["charger1"]
+    state.detect_manual_override()
+    assert state.manual_override_detected is False  # absorbed as a clamp
+
+    # Well after that (no new command issued since), the user genuinely
+    # changes it again.
+    state.last_update_time = int(time() - 30)
+    charger.set_current_limits(dict.fromkeys(Phase, 12))
+    state.detect_manual_override()
+
+    assert state.manual_override_detected is True
+    assert state.requested_current == dict.fromkeys(Phase, 12)
+
+
 def test_multiple_chargers_allocation(power_allocator: PowerAllocator):
     """Test allocating current to multiple chargers."""
     # Create two chargers
